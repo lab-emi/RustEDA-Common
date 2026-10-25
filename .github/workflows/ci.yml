@@ -1,0 +1,31 @@
+name: Shared foundation
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_BUILD_JOBS: 2
+  RUST_TEST_THREADS: 2
+  CARGO_INCREMENTAL: 0
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  CARGO_PROFILE_TEST_DEBUG: line-tables-only
+
+jobs:
+  cpu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - run: python3 scripts/shared_manifest.py --check
+      - run: cargo fmt --all -- --check
+      - name: Test shared foundation
+        shell: bash
+        run: |
+          free -h
+          ulimit -v 6291456
+          /usr/bin/time -v timeout --kill-after=10s 1200s cargo test --workspace --locked
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
