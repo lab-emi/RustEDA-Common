@@ -2,7 +2,7 @@
 use cuda_device::{kernel, thread};
 use cuda_host::cuda_module;
 
-#[path = "../../src/predicate.rs"]
+#[path = "../../../../crates/core/rusteda-compute/src/geometry/kernels/rect_pairs.rs"]
 mod predicate;
 
 #[cuda_module]

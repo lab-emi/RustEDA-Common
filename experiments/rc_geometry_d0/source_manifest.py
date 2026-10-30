@@ -30,8 +30,9 @@ def main():
     parser.add_argument('--base-rev', choices=['empty'], required=True)
     args = parser.parse_args()
     source = Path(__file__).resolve().parent
-    paths = sorted(p for p in source.rglob('*') if p.is_file()
+    paths = sorted(p for p in source.rglob('*') if p.is_file() and p.suffix not in ('.ll', '.ptx')
                    and not any(part in ('target', '__pycache__') for part in p.relative_to(source).parts))
+    paths.append(source.parents[1] / 'crates/core/rusteda-compute/src/geometry/kernels/rect_pairs.rs')
     assert len(paths) <= 32
     records = [identity(path) for path in paths]
     destination = args.workspace.resolve()
@@ -40,8 +41,8 @@ def main():
     destination.mkdir(parents=True)
     result = dict(schema='rusteda.rc-geometry-d0-source-preparation.v1',
         status='prepared_unverified', foundation_base='778fa8dfd52b52aa978743445c32174fa777880b',
-        sources=records, cpu_tests='unchecked_timing_isolation', ptx_build='unchecked_timing_isolation',
-        ptx_artifact=None, gpu_differential='unchecked_timing_isolation',
+        sources=records, cpu_tests='unchecked_by_source_preparation_manifest', ptx_build='unchecked_by_source_preparation_manifest',
+        ptx_artifact=None, gpu_differential='unchecked_by_source_preparation_manifest',
         toolchain_checkout='a4a939a9b5f01f3bf712e92386922e1bc7c434a9',
         scope='Source-only D0; no CPU correctness, GPU, extraction, signoff or speedup claim')
     (destination / 'manifest.json').write_text(json.dumps(result, indent=2) + '\n')

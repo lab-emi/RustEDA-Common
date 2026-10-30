@@ -1,11 +1,11 @@
-# Deferred cudarc launcher
+# D0 cudarc launcher ABI
 
-Do not implement/activate until the CPU tests have passed and timing isolation
-is released. Planned public entrypoint:
+Activated only after the recorded independent CPU gate and timing release.
+The implementation in `src/cuda.rs` uses the following session API:
 
 ```rust
-pub fn run(batch: Batch<'_>, limits: Limits, ptx: &VerifiedPtx)
-    -> Result<Vec<u32>, Error>;
+Session::new(&VerifiedPtx) -> Result<Session, Error>;
+Session::run(Batch<'_>, Limits) -> Result<Run, Error>;
 ```
 
 `VerifiedPtx::load(manifest)` must stream-verify source/toolchain/PTX FileIds and
@@ -31,4 +31,4 @@ Tests must bind the PTX hash manifest, mutate one hash/source byte and require
 rejection, repeat deterministically, and record unavailable GPU cases as
 unverified. Keep context/JIT, input validation/packing, H2D, launch, sync, D2H
 and whole-call timing separate. No GPU performance claim is authorized by
-source preparation.
+source preparation alone. Actual required tests passed separately; see evidence.json.

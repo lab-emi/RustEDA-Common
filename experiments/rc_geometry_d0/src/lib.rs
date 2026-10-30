@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //! D0 source-only bounded integer geometry experiment; not a production backend.
+#[cfg(feature = "cuda")]
+pub mod cuda;
+#[path = "../../../crates/core/rusteda-compute/src/geometry/kernels/rect_pairs.rs"]
 pub mod predicate;
 
 pub use predicate::{Queries, Shapes};
@@ -43,6 +46,7 @@ pub enum Error {
     Invalid(&'static str),
     Budget(&'static str),
     Device(String),
+    Unavailable(String),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

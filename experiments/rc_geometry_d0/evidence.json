@@ -1,0 +1,361 @@
+{
+  "schema": "rusteda.rc-geometry-d0-feasibility.v1",
+  "status": "exact_differential_passed_no_established_end_to_end_benefit",
+  "cpu_first_gate": {
+    "path": "/home/cgao/git/RustEDA/.work/perf-20261030/d0-execution/cpu-gate.json",
+    "sha256": "486e36d42250723f7387ea80e38dc92f319a569024e045565bd6ddcf0c2e8d77",
+    "bytes": 1666
+  },
+  "cpu_tests": 4,
+  "required_gpu_tests": 2,
+  "integer_tolerance": 0,
+  "gpu_validation_log": {
+    "path": "/home/cgao/git/RustEDA/.work/perf-20261030/d0-execution/gpu-required-cpu-pin.log",
+    "sha256": "a221ab21501c245ae2664050c5184caf5c53fe59796807bb9797ba176b1a7206",
+    "bytes": 696
+  },
+  "artifact_manifest": {
+    "path": "/home/cgao/git/RustEDA/.work/perf-20261030/d0-execution/ptx-artifact03/manifest.json",
+    "sha256": "f9d763efe272579f0c2d86b22cccbaf583b8bf919ba83bd28340133b9ab5f6c0",
+    "bytes": 5771
+  },
+  "ptx": {
+    "path": "/home/cgao/git/RustEDA/modules/RustEDA-Common-perf/experiments/rc_geometry_d0/gpu/rusteda_rc_geometry_kernels_d0.ptx",
+    "sha256": "e056448b57d54c8354e358bb4280761372b668a3d06aeaa803e6a8018e3215b4",
+    "bytes": 7463
+  },
+  "byte_reproducible_ptx_builds": [
+    {
+      "log": {
+        "path": "/home/cgao/git/RustEDA/.work/perf-20261030/d0-execution/ptx-build01.time",
+        "sha256": "fa72e6fa6fdad2631570c84066588c38196e60923db9e94e0814fa2598413ac0",
+        "bytes": 850
+      },
+      "exit_code": 0,
+      "peak_rss_kib": 552708,
+      "wall_clock": "0:24.34"
+    },
+    {
+      "log": {
+        "path": "/home/cgao/git/RustEDA/.work/perf-20261030/d0-execution/ptx-build03.time",
+        "sha256": "e5180e0c0b19d2b5e94124409b9ff92219347837c163a0080ceb9ceee5c733cc",
+        "bytes": 832
+      },
+      "exit_code": 0,
+      "peak_rss_kib": 274048,
+      "wall_clock": "0:00.61"
+    }
+  ],
+  "ptx_parameter_abi": "six(pointer,u64_length) slices followed by one output pointer;13u64parameters inspected",
+  "shared_kernel": {
+    "path": "/home/cgao/git/RustEDA/modules/RustEDA-Common-perf/crates/core/rusteda-compute/src/geometry/kernels/rect_pairs.rs",
+    "sha256": "77d2b7ff10a32e3063bdaa27d3e84138d2971a137099572a64b0b2d6980c5d88",
+    "bytes": 1361
+  },
+  "hardware": "NVIDIA GeForce RTX 4090 Laptop GPU sm_89",
+  "driver": "615.78.08",
+  "rust_gpu": "1.99.1",
+  "rust_host": "1.97.1",
+  "llvm": "23.1.3",
+  "cuda_rust_revision": "a4a939a9b5f01f3bf712e92386922e1bc7c434a9",
+  "source_file_ids": [
+    {
+      "path": "/home/cgao/git/RustEDA/modules/RustEDA-Common-perf/experiments/rc_geometry_d0/Cargo.toml",
+      "sha256": "8b91ed5a95e1e5b5a6053bc217f9bc4c1f470e956c4427cca1210ba5d63dcd16",
+      "bytes": 666
+    },
+    {
+      "path": "/home/cgao/git/RustEDA/modules/RustEDA-Common-perf/experiments/rc_geometry_d0/Cargo.lock",
+      "sha256": "87a613426a8c214f5197737e10ae581653b8f45c81089e676316137f3f400b78",
+      "bytes": 6933
+    },
+    {
+      "path": "/home/cgao/git/RustEDA/modules/RustEDA-Common-perf/experiments/rc_geometry_d0/src/lib.rs",
+      "sha256": "25be38c07227fab78bc547c6364e5020b933e83614f56de411913094bf053010",
+      "bytes": 5349
+    },
+    {
+      "path": "/home/cgao/git/RustEDA/modules/RustEDA-Common-perf/experiments/rc_geometry_d0/src/cuda.rs",
+      "sha256": "643c0c1dd177f18830ffe24095babbba7c86a0db6b8c25ea8e27851be45a7bbb",
+      "bytes": 10808
+    },
+    {
+      "path": "/home/cgao/git/RustEDA/modules/RustEDA-Common-perf/experiments/rc_geometry_d0/tests/exact.rs",
+      "sha256": "4803fa624e7d117455dec45a7edd6b9c471f3086c7c9e8f13bdb0167aeba3eff",
+      "bytes": 5928
+    },
+    {
+      "path": "/home/cgao/git/RustEDA/modules/RustEDA-Common-perf/experiments/rc_geometry_d0/tests/gpu.rs",
+      "sha256": "187f50f093f0f5f7ac1c9b3a3fcb89b2786f369dd7390c9ac6f768617c11fe61",
+      "bytes": 4260
+    },
+    {
+      "path": "/home/cgao/git/RustEDA/modules/RustEDA-Common-perf/experiments/rc_geometry_d0/tests/fixture/mod.rs",
+      "sha256": "f563672afab289df6359d7e9c464b35515aa1ba3d357ed6678ca8b6ef0f42b62",
+      "bytes": 2269
+    },
+    {
+      "path": "/home/cgao/git/RustEDA/modules/RustEDA-Common-perf/experiments/rc_geometry_d0/examples/compare.rs",
+      "sha256": "8b6ebd186a886f62d09ff87f5033e13984677ce22ee40c4549f477776b8ba344",
+      "bytes": 3111
+    },
+    {
+      "path": "/home/cgao/git/RustEDA/modules/RustEDA-Common-perf/experiments/rc_geometry_d0/gpu/Cargo.toml",
+      "sha256": "8780b78ef65c91459784688b8aa44405374d74e1f86f9a8d76a0ff5038c479af",
+      "bytes": 497
+    },
+    {
+      "path": "/home/cgao/git/RustEDA/modules/RustEDA-Common-perf/experiments/rc_geometry_d0/gpu/Cargo.lock",
+      "sha256": "d0961d7119abe5866b847efb9f7b655c7c00db84cae1c4a1d575dc67e819a0a8",
+      "bytes": 20558
+    },
+    {
+      "path": "/home/cgao/git/RustEDA/modules/RustEDA-Common-perf/experiments/rc_geometry_d0/gpu/rust-toolchain.toml",
+      "sha256": "07f24d06de77c0d27348f9411c87d458fe57ccb14b027e375df0327c7076ad45",
+      "bytes": 84
+    },
+    {
+      "path": "/home/cgao/git/RustEDA/modules/RustEDA-Common-perf/experiments/rc_geometry_d0/gpu/src/main.rs",
+      "sha256": "fe1750610b99483c9173846eb3dd4378e0f61a3d9d2e2d5fccfe0053ca3c18e9",
+      "bytes": 1272
+    },
+    {
+      "path": "/home/cgao/git/RustEDA/modules/RustEDA-Common-perf/experiments/rc_geometry_d0/build_manifest.py",
+      "sha256": "44eb80f19dca1d6d02936987a4619236a1d17b9f11bdc230d692c002083dd12b",
+      "bytes": 3580
+    },
+    {
+      "path": "/home/cgao/git/RustEDA/modules/RustEDA-Common-perf/crates/core/rusteda-compute/src/geometry/kernels/rect_pairs.rs",
+      "sha256": "77d2b7ff10a32e3063bdaa27d3e84138d2971a137099572a64b0b2d6980c5d88",
+      "bytes": 1361
+    }
+  ],
+  "tool_file_ids": [
+    {
+      "path": "/home/cgao/git/RustEDA/.work/gpu/cuda-rust/cuda-oxide/target/debug/cargo-oxide",
+      "sha256": "edea2c3eceaa4ad4664f9399157e8c88a3cc28566508f14ff6772177b5cde6e0",
+      "bytes": 131942824
+    },
+    {
+      "path": "/home/cgao/.cargo/cuda-oxide/librustc_codegen_cuda.so",
+      "sha256": "2293afb82b6e8919c2d0b302c1e4daffe347c4820dcf22225222a41bfca1ec4d",
+      "bytes": 482813816
+    },
+    {
+      "path": "/usr/bin/llc",
+      "sha256": "ce064ef53dcba4b6de1d7bf2efc2c7c3f744929ab85f1fc07672dd1c784c59dd",
+      "bytes": 162896
+    },
+    {
+      "path": "/home/cgao/.rustup/toolchains/1.99.1-x86_64-unknown-linux-gnu/bin/rustc",
+      "sha256": "b53b780f77f952062f8ca8a3b70aef2390b1e45ad91939be94afdc9543026853",
+      "bytes": 648536
+    },
+    {
+      "path": "/home/cgao/git/RustEDA/.work/gpu/cuda-venv/lib/python3.13/site-packages/nvidia/cu13/bin/nvcc",
+      "sha256": "b6c72825585cb3d64d8cead9b43c165afed0f0f672319416261a0df76e6d600c",
+      "bytes": 37426800
+    },
+    {
+      "path": "/home/cgao/git/RustEDA/.work/gpu/cuda-venv/lib/python3.13/site-packages/nvidia/cu13/nvvm/libdevice/libdevice.10.bc",
+      "sha256": "93d6b5b9c8b284a2273b2b2578ac42c59b21c9091e1d35bb63a9b7f9072079dd",
+      "bytes": 465412
+    },
+    {
+      "path": "/home/cgao/git/RustEDA/.work/gpu/cuda-venv/lib/python3.13/site-packages/nvidia/cu13/include/cuda.h",
+      "sha256": "7a79d67ca888061b1dfbe4739b51ad64f85a2f3ad874947ce09b2c635b4c7072",
+      "bytes": 1280649
+    },
+    {
+      "path": "/home/cgao/git/RustEDA/.work/gpu/cuda-venv/lib/python3.13/site-packages/nvidia/cu13/include/curand.h",
+      "sha256": "d8d05e05fd1e52e77d89d796f23bfd78d713953aeee57114095c5525565e2bf5",
+      "bytes": 44075
+    }
+  ],
+  "resource_guards": {
+    "build": {
+      "ram_mib": 4096,
+      "swap_mib": 1024,
+      "timeout_seconds": 180,
+      "jobs": 2
+    },
+    "test": {
+      "ram_mib": 2048,
+      "swap_mib": 512,
+      "timeout_seconds": 180,
+      "test_threads": 2
+    }
+  },
+  "checks": {
+    "cpu-test": {
+      "log": {
+        "path": "/home/cgao/git/RustEDA/.work/perf-20261030/d0-execution/cpu-test.time",
+        "sha256": "c69fa1ae57b4ddb2384899521f1b083a5d3f0d2c06aea46a356031cb7ad77cce",
+        "bytes": 808
+      },
+      "exit_code": 0,
+      "peak_rss_kib": 314680,
+      "wall_clock": "0:01.78"
+    },
+    "host-cuda-build": {
+      "log": {
+        "path": "/home/cgao/git/RustEDA/.work/perf-20261030/d0-execution/host-cuda-build.time",
+        "sha256": "dd6a7a558f917ab157dea58887c66e072974838338162bf3f48d2281e7516365",
+        "bytes": 834
+      },
+      "exit_code": 0,
+      "peak_rss_kib": 525520,
+      "wall_clock": "0:05.01"
+    },
+    "clippy-accepted": {
+      "log": {
+        "path": "/home/cgao/git/RustEDA/.work/perf-20261030/d0-execution/clippy-accepted.time",
+        "sha256": "73f6a3a81f60959641bcee9b4e729b8b55b9057ead4328887a5b090f14c074a5",
+        "bytes": 850
+      },
+      "exit_code": 0,
+      "peak_rss_kib": 167936,
+      "wall_clock": "0:00.30"
+    },
+    "docs-accepted": {
+      "log": {
+        "path": "/home/cgao/git/RustEDA/.work/perf-20261030/d0-execution/docs-accepted.time",
+        "sha256": "9d8b33e4990aab94b6ed17a404af9e37f3fd6b008f01df5ec02f89e86ee38bee",
+        "bytes": 826
+      },
+      "exit_code": 0,
+      "peak_rss_kib": 426144,
+      "wall_clock": "0:00.30"
+    },
+    "tests-final": {
+      "log": {
+        "path": "/home/cgao/git/RustEDA/.work/perf-20261030/d0-execution/tests-final.time",
+        "sha256": "670ae40583bfe68070ed721102a3fe1b5a8e63718e68ead99431b269b7ff0255",
+        "bytes": 821
+      },
+      "exit_code": 0,
+      "peak_rss_kib": 208572,
+      "wall_clock": "0:01.34"
+    },
+    "gpu-required-cpu-pin": {
+      "log": {
+        "path": "/home/cgao/git/RustEDA/.work/perf-20261030/d0-execution/gpu-required-cpu-pin.time",
+        "sha256": "326a0b8cccabf1e17557baa13a1cb0e36076dccf67c19039c26ed8ad2a218701",
+        "bytes": 856
+      },
+      "exit_code": 0,
+      "peak_rss_kib": 213608,
+      "wall_clock": "0:08.65"
+    },
+    "compare-final": {
+      "log": {
+        "path": "/home/cgao/git/RustEDA/.work/perf-20261030/d0-execution/compare-final.time",
+        "sha256": "c761321cbcdc8a4e438ed76bfe0da6be8f7efdf5b6a42802ab974e1a02eef61a",
+        "bytes": 815
+      },
+      "exit_code": 0,
+      "peak_rss_kib": 396120,
+      "wall_clock": "0:01.22"
+    }
+  },
+  "benchmark_binary": {
+    "path": "/home/cgao/git/RustEDA/.work/target/Common-d0/release/examples/compare",
+    "sha256": "f4e137c26811558e320c3dcf03e146b0e84b36225777f2e8a8d9ef876f330b3e",
+    "bytes": 1152088
+  },
+  "benchmark_raw": {
+    "path": "/home/cgao/git/RustEDA/.work/perf-20261030/d0-execution/compare-final.jsonl",
+    "sha256": "f6499e384b0f930d380f33125e26c5e50b872d3e65fd45278b9a7f8b5feec16f",
+    "bytes": 8418
+  },
+  "benchmark_setup": {
+    "cold_setup_seconds": 0.719870121,
+    "context_jit_seconds": 0.372674819,
+    "device": "NVIDIA GeForce RTX 4090 Laptop GPU sm_89",
+    "manifest_seconds": 0.347194704,
+    "schema": "rusteda.rc-geometry-d0-timing.v1",
+    "scope": "integer pair filter only; no extraction or whole-flow speedup claim"
+  },
+  "benchmark_cases": [
+    {
+      "pairs": 1024,
+      "observations": 3,
+      "median_seconds": {
+        "packing_seconds": 0.000462587,
+        "cpu_with_packing_seconds": 0.000642219,
+        "gpu_warm_with_packing_seconds": 0.000771309,
+        "gpu_cold_with_packing_seconds": 0.72064143,
+        "h2d_allocation_seconds": 0.000133083,
+        "kernel_sync_seconds": 1.6245e-05,
+        "d2h_sync_seconds": 1.0878e-05
+      },
+      "device_buffer_payload_peak_bytes": 1273856
+    },
+    {
+      "pairs": 65536,
+      "observations": 3,
+      "median_seconds": {
+        "packing_seconds": 0.000393272,
+        "cpu_with_packing_seconds": 0.000831491,
+        "gpu_warm_with_packing_seconds": 0.000934214,
+        "gpu_cold_with_packing_seconds": 0.720804335,
+        "h2d_allocation_seconds": 0.00020751,
+        "kernel_sync_seconds": 1.9132e-05,
+        "d2h_sync_seconds": 6.236e-05
+      },
+      "device_buffer_payload_peak_bytes": 2048000
+    },
+    {
+      "pairs": 1048576,
+      "observations": 3,
+      "median_seconds": {
+        "packing_seconds": 0.006193336,
+        "cpu_with_packing_seconds": 0.012354685,
+        "gpu_warm_with_packing_seconds": 0.013229952,
+        "gpu_cold_with_packing_seconds": 0.7331000730000001,
+        "h2d_allocation_seconds": 0.002179653,
+        "kernel_sync_seconds": 7.602e-05,
+        "d2h_sync_seconds": 0.00212116
+      },
+      "device_buffer_payload_peak_bytes": 13844480
+    },
+    {
+      "pairs": 8000000,
+      "observations": 3,
+      "median_seconds": {
+        "packing_seconds": 0.044774225,
+        "cpu_with_packing_seconds": 0.089267002,
+        "gpu_warm_with_packing_seconds": 0.08751313299999999,
+        "gpu_cold_with_packing_seconds": 0.8073832540000001,
+        "h2d_allocation_seconds": 0.017110598,
+        "kernel_sync_seconds": 0.000512936,
+        "d2h_sync_seconds": 0.009150339
+      },
+      "device_buffer_payload_peak_bytes": 97261568
+    }
+  ],
+  "benchmark_cpu_affinity": [
+    16,
+    17,
+    18,
+    19
+  ],
+  "benchmark_cpu_workers": 2,
+  "jit_disk_cache": "disabled with CUDA_CACHE_DISABLE=1 for final process",
+  "device_memory": {
+    "payload_peak_bytes": 97261568,
+    "sampled_global_free_highwater_delta_bytes": 100663296,
+    "scope": "global free delta includes pooling/other clients, excludes context already live at baseline; exact payload is own simultaneous buffers",
+    "driver_context_peak_status": "not_separately_measured"
+  },
+  "fallback": {
+    "default": "pure Rust CPU remains independent of CUDA",
+    "requested_cuda": "no silent substitution; explicit unavailable/device/budget/invalid error",
+    "unavailable_hardware_negative_status": "not_exercised_on_this_available_host"
+  },
+  "production_dispatch": "unchanged",
+  "rustroad_integration": "not_implemented",
+  "g1": "not_completed",
+  "signoff": "unchecked_by_this_experiment",
+  "conclusion": "CPU packing and transfers dominate; measured reused-context result is near parity and cold process is slower. Future resident spatial-index candidate generation needs a separate profile and bounded CPU oracle."
+}
