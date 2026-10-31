@@ -75,12 +75,23 @@ reuse claim in this component.
 
 ## Required future production stream (unimplemented)
 
-Existing frozen `g1-design01/metadata-v2.json` derives 11,808,534 queries from the
-Ibex profile (472,341,360 raw query-record bytes), or181 tiles at65,536. This is a
-counter-derived design quantity, not a newly measured stream. Exact selected
-V/template/bin inventory and the real legacy bridge remain outstanding. The
-original profile has85,836 instances; other metadata bounds are conditional and
-must not substitute for actual lowering admission.
+Existing frozen `g1-design01/metadata-v2.json` derives 11,808,534 queries from
+`geometry-profile-build01/profile01/stdout.json`, whose workspace_revision is
+**rev56**. That quantity implies472,341,360 raw query-record bytes and181 tiles
+at65,536. It is counter-derived, not a newly measured stream.
+
+The separate **rev4** result in
+`crossing-build01/large-replay02/rev4-crossings8/stdout.json` has bound_probes
+11,800,294. Subtracting its64-query preflight prefix gives11,800,230 queries,
+472,009,200 raw query-record bytes, and181 hypothetical component tiles. Its
+actual parallel_tiles184,379 use the legacy CPU tile size64, not this component's
+65,536-query single-batch cap. These two revisions and accounting units must not
+be merged or treated as one measured query stream. Neither stream was executed
+by this component.
+
+Exact selected V/template/bin inventory and the real legacy bridge remain
+outstanding. The rev56 profile metadata has85,836 instances; other bounds are
+conditional and must not substitute for actual lowering admission.
 
 Spawning181 cold helpers, resetting work budgets per tile, or repeatedly copying
 all CSR geometry would not establish a production benefit. A later versioned
