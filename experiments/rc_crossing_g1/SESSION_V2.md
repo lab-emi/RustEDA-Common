@@ -1,4 +1,18 @@
-# Foreground CPU session v2 — source proposal
+# Foreground CPU session v2 — qualified CPU component
+
+The frozen Source05 component has passed the bounded build/self-controls,
+independent zero-tolerance v2 manual/streaming checks (129 calls), and independent
+new-v1 behavior checks (120 calls). See [SESSION_V2_QUALIFICATION.md](SESSION_V2_QUALIFICATION.md)
+for exact identities and limits. This is an isolated CPU component qualification;
+Road v2 capture, real large Ibex, GPU, production memory and physical signoff
+remain unqualified. V1 per-child PID records are unavailable.
+
+This documentation update is separate from the executed Source05 snapshot.
+The original source proposal below is retained as historical design context;
+its source-only statements describe that freeze point. Frozen Source05 files,
+old live FileIDs, protocols and actual execution receipts were not rewritten.
+
+## Original Source05 proposal
 
 This isolated experiment extends the qualified v1 component with a single
 foreground CPU session. It is source-only: no compilation, tests, native calls,
