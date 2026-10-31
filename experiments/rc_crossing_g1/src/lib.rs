@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 pub mod format;
+pub mod session;
+pub mod session_format;
 
 pub const MAX_VIEW_BYTES: u64 = 64 << 20;
 pub const MAX_OUTPUT_BYTES: u64 = 128 << 10;
@@ -530,24 +532,7 @@ pub fn admit(view: View<'_>, limits: Limits) -> Result<Admission> {
     for q in 0..nq {
         work.charge(1)?;
         let query = view.queries.get(q)?;
-        if !query.rect.positive() || query.layer >= view.layer_count {
-            return Err(Error::Invalid("query rectangle/layer"));
-        }
-        let count = area(view.grid.span(query.rect.expanded()?))?;
-        if count > limits.max_query_cells {
-            return Err(Error::Budget("query extent"));
-        }
-        // Each CSR entry can appear at most once; each instance/template is
-        // visited once at the first common bin, even if it spans many bins.
-        let upper = if layer_mask & (1u32 << query.layer) == 0 {
-            1
-        } else {
-            1u64.checked_add(count)
-                .and_then(|v| v.checked_add(view.entries.len() as u64))
-                .and_then(|v| v.checked_add(ni as u64))
-                .and_then(|v| v.checked_add(prefix as u64))
-                .ok_or(Error::Budget("query work bound"))?
-        };
+        let upper = query_bound(view, query, layer_mask, limits.max_query_cells)?;
         reserve(
             &mut reserved,
             upper
@@ -600,53 +585,91 @@ pub struct Activation {
     pub stats: Stats,
 }
 
-fn query(view: View<'_>, q: Query, marked: &mut [u64], mask: u32, cap: u64) -> Result<u64> {
-    let mut work = Work { used: 0, cap };
-    work.charge(1)?;
-    if mask & (1u32 << q.layer) == 0 {
-        return Ok(work.used);
+fn query_bound(view: View<'_>, query: Query, layer_mask: u32, max_query_cells: u64) -> Result<u64> {
+    if !query.rect.positive() || query.layer >= view.layer_count {
+        return Err(Error::Invalid("query rectangle/layer"));
     }
-    let expanded = q.rect.expanded()?;
-    let range = view.grid.span(expanded);
-    for x in range[0]..=range[2] {
-        for y in range[1]..=range[3] {
-            work.charge(1)?;
-            let Some(cell) = view.grid.index(x, y) else {
-                continue;
-            };
-            for e in view.offsets.get(cell)? as usize..view.offsets.get(cell + 1)? as usize {
+    let count = area(view.grid.span(query.rect.expanded()?))?;
+    if count > max_query_cells {
+        return Err(Error::Budget("query extent"));
+    }
+    if layer_mask & (1u32 << query.layer) == 0 {
+        return Ok(1);
+    }
+    1u64.checked_add(count)
+        .and_then(|v| v.checked_add(view.entries.len() as u64))
+        .and_then(|v| v.checked_add(view.instances.len() as u64))
+        .and_then(|v| v.checked_add(view.virtual_count as u64))
+        .ok_or(Error::Budget("query work bound"))
+}
+
+fn query_measured(
+    view: View<'_>,
+    q: Query,
+    marked: &mut [u64],
+    mask: u32,
+    cap: u64,
+) -> QueryOutcome {
+    let mut work = Work { used: 0, cap };
+    let result = (|| -> Result<()> {
+        work.charge(1)?;
+        if mask & (1u32 << q.layer) == 0 {
+            return Ok(());
+        }
+        let expanded = q.rect.expanded()?;
+        let range = view.grid.span(expanded);
+        for x in range[0]..=range[2] {
+            for y in range[1]..=range[3] {
                 work.charge(1)?;
-                let id = view.entries.get(e)? as usize;
-                let instance = view.instances.get(id)?;
-                let span = view.grid.span(instance.bounds);
-                if x != range[0].max(span[0]) || y != range[1].max(span[1]) {
+                let Some(cell) = view.grid.index(x, y) else {
                     continue;
-                }
-                work.charge(1)?;
-                if !expanded.overlaps(instance.bounds) {
-                    continue;
-                }
-                let t = instance.template as usize;
-                for r in view.template_offsets.get(t)? as usize
-                    ..view.template_offsets.get(t + 1)? as usize
-                {
+                };
+                for e in view.offsets.get(cell)? as usize..view.offsets.get(cell + 1)? as usize {
                     work.charge(1)?;
-                    let rect = view.rectangles.get(r)?;
-                    if rect.layer == q.layer && q.rect.overlaps(instance.world(rect.rect)?) {
-                        let bit = (instance.first as usize)
-                            .checked_add(rect.ordinal as usize)
-                            .filter(|&n| n < view.virtual_count)
-                            .ok_or(Error::Invalid("activation ordinal"))?;
-                        let word = marked
-                            .get_mut(bit / 64)
-                            .ok_or(Error::Invalid("activation extent"))?;
-                        *word |= 1u64 << (bit % 64);
+                    let id = view.entries.get(e)? as usize;
+                    let instance = view.instances.get(id)?;
+                    let span = view.grid.span(instance.bounds);
+                    if x != range[0].max(span[0]) || y != range[1].max(span[1]) {
+                        continue;
+                    }
+                    work.charge(1)?;
+                    if !expanded.overlaps(instance.bounds) {
+                        continue;
+                    }
+                    let t = instance.template as usize;
+                    for r in view.template_offsets.get(t)? as usize
+                        ..view.template_offsets.get(t + 1)? as usize
+                    {
+                        work.charge(1)?;
+                        let rect = view.rectangles.get(r)?;
+                        if rect.layer == q.layer && q.rect.overlaps(instance.world(rect.rect)?) {
+                            let bit = (instance.first as usize)
+                                .checked_add(rect.ordinal as usize)
+                                .filter(|&n| n < view.virtual_count)
+                                .ok_or(Error::Invalid("activation ordinal"))?;
+                            let word = marked
+                                .get_mut(bit / 64)
+                                .ok_or(Error::Invalid("activation extent"))?;
+                            *word |= 1u64 << (bit % 64);
+                        }
                     }
                 }
             }
         }
+        Ok(())
+    })();
+    QueryOutcome {
+        work: work.used,
+        error: result.err(),
     }
-    Ok(work.used)
+}
+
+fn query(view: View<'_>, q: Query, marked: &mut [u64], mask: u32, cap: u64) -> Result<u64> {
+    let outcome = query_measured(view, q, marked, mask, cap);
+    match outcome.error {
+        Some(error) => Err(error),
+        None => Ok(outcome.work),
+    }
 }
 
 /// Pure Rust deterministic integer reference. No geometry/input clone per worker.
@@ -758,4 +781,69 @@ pub fn cpu_ref(view: View<'_>, limits: Limits) -> Result<Activation> {
             aux_bytes: admission.aux_bytes,
         },
     })
+}
+
+#[cfg(test)]
+mod session_meter_tests {
+    use super::*;
+
+    #[test]
+    fn failed_query_retains_charged_prefix_without_changing_v1_error() {
+        let rect = Rect {
+            lx: 0,
+            ly: 0,
+            ux: 10,
+            uy: 10,
+        };
+        let offsets = [0, 1];
+        let entries = [0];
+        let template_offsets = [0, 1];
+        let instances = [Instance {
+            at: [0, 0],
+            height: 10,
+            template: 0,
+            first: 0,
+            bounds: rect,
+            orientation: Orientation::N,
+        }];
+        let rectangles = [TemplateRect {
+            rect,
+            layer: 0,
+            ordinal: 0,
+        }];
+        let view = View {
+            grid: Grid {
+                origin: [0, 0],
+                bin: 1000,
+                width: 1,
+                height: 1,
+            },
+            layer_count: 1,
+            virtual_count: 1,
+            offsets: Table::Native(&offsets),
+            entries: Table::Native(&entries),
+            instances: Table::Native(&instances),
+            template_offsets: Table::Native(&template_offsets),
+            rectangles: Table::Native(&rectangles),
+            queries: Table::Native(&[]),
+        };
+        let q = Query {
+            rect: Rect {
+                lx: 1,
+                ly: 1,
+                ux: 2,
+                uy: 2,
+            },
+            layer: 0,
+        };
+        let mut bits = [0];
+        let outcome = query_measured(view, q, &mut bits, 1, 1);
+        assert_eq!(outcome.work, 1);
+        assert_eq!(outcome.error, Some(Error::Budget("aggregate work")));
+        assert_eq!(bits, [0]);
+        assert_eq!(
+            query(view, q, &mut bits, 1, 1).unwrap_err(),
+            outcome.error.unwrap()
+        );
+    }
 }

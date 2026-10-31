@@ -6,6 +6,10 @@ rust-version = "1.97"
 license = "Apache-2.0"
 publish = false
 
+[[bin]]
+name = "rusteda-rc-crossing-g1-session"
+path = "src/bin/session.rs"
+
 # Isolated component; production Common workspace/dispatch stay unchanged.
 [workspace]
 
