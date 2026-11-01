@@ -36,3 +36,5 @@ The isolated G1 snapshot passes CPU workspace type checking, formatting and
 rebuild PTX or qualify runtime images. It adds the experimental integer crossing
 session to the current production foundation; Road continues to use its existing
 extraction path. Recorded capture comparisons are scoped component evidence.
+
+The standalone CPU session/transport suite passes 35 tests (0 ignored); GPU execution remains unchecked in this publication.
