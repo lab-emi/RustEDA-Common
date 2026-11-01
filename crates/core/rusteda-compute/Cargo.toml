@@ -17,6 +17,7 @@ cuda = ["dep:cudarc"]
 rusteda-core.workspace = true
 bytemuck.workspace = true
 rayon.workspace = true
+sha2 = "=0.10.9"
 cudarc = { workspace = true, optional = true }
 
 [lints]

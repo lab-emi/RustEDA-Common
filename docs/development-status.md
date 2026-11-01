@@ -28,3 +28,11 @@ The isolated publication checkout passes 418 regular Rust tests (11 ignored),
 format checks and all-target/all-feature Clippy. The ignored external/GPU/scale
 checks are not counted as passes. These source checks do not create a new
 complete-flow measurement.
+
+## Experimental G1 publication checks
+
+The isolated G1 snapshot passes CPU workspace type checking, formatting and
+39 compute-library tests (2 ignored). This publication does not run GPU tests,
+rebuild PTX or qualify runtime images. It adds the experimental integer crossing
+session to the current production foundation; Road continues to use its existing
+extraction path. Recorded capture comparisons are scoped component evidence.

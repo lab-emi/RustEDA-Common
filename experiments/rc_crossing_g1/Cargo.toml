@@ -1,0 +1,59 @@
+[package]
+name = "rusteda-rc-crossing-g1"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97"
+license = "Apache-2.0"
+publish = false
+autobins = false
+autotests = false
+
+[[bin]]
+name = "rusteda-rc-crossing-g1-session-v3"
+path = "src/bin/session_v3.rs"
+
+[[test]]
+name = "cpu"
+path = "tests/cpu.rs"
+
+[[test]]
+name = "session_cpu"
+path = "tests/session_cpu.rs"
+
+[[test]]
+name = "v3_transport"
+path = "tests/v3_transport.rs"
+
+[[test]]
+name = "gpu_required"
+path = "tests/gpu_required.rs"
+required-features = ["cuda"]
+
+[[test]]
+name = "gpu_real"
+path = "tests/gpu_real.rs"
+required-features = ["cuda"]
+
+# Isolated component; production Common workspace/dispatch stay unchanged.
+[workspace]
+
+[features]
+cuda = ["rusteda-compute/cuda"]
+
+[dependencies]
+rusteda-compute = { path = "../../crates/core/rusteda-compute", default-features = false }
+rayon = "=1.12.0"
+memmap2 = "=0.9.11"
+sha2 = "=0.10.9"
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.149"
+
+[lints.rust]
+unsafe_code = "deny"
+missing_debug_implementations = "warn"
+
+[lints.clippy]
+all = "warn"
+
+[profile.release]
+debug = "line-tables-only"

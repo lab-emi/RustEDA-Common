@@ -253,6 +253,369 @@ pub fn launch_1d(units: usize, block: u32) -> LaunchConfig {
     }
 }
 
+/// Maximum admitted prebuilt PTX text, independent of any compiler image cache.
+pub const MAX_PREBUILT_PTX_BYTES: usize = 8 << 20;
+/// Fixed G1 driver entry; the ABI probe is deliberately not a selectable image.
+pub const G1_PTX_ENTRY: &str = "rusteda_g1_crossings_v1";
+
+/// Hash-checked, bounded PTX text with the exact G1 entry parameter shape.
+///
+/// This verifies the artifact bytes, not the external source/tool/CPU gate. The
+/// adapter must authenticate that complete chain before calling this constructor
+/// and charge its read/hash passes before any context creation. No path is opened
+/// here, so the adapter can retain its same-descriptor locks and file identities.
+pub struct VerifiedPtx {
+    text: String,
+    sha256: [u8; 32],
+}
+
+impl std::fmt::Debug for VerifiedPtx {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("VerifiedPtx")
+            .field("bytes", &self.text.len())
+            .field("sha256", &self.sha256)
+            .finish()
+    }
+}
+
+impl VerifiedPtx {
+    /// Admits already-read PTX bytes before allowing a driver-owned lifetime.
+    ///
+    /// # Errors
+    /// Rejects excess capacity/length, wrong hash, non-ASCII or NUL text, wrong
+    /// target, duplicate/missing entry or any noncanonical parameter shape.
+    pub fn verify(
+        raw: Vec<u8>,
+        expected_bytes: u64,
+        expected_sha256: [u8; 32],
+    ) -> Result<Self, GpuError> {
+        use sha2::{Digest, Sha256};
+
+        if raw.is_empty()
+            || raw.len() > MAX_PREBUILT_PTX_BYTES
+            || raw.capacity() > MAX_PREBUILT_PTX_BYTES
+            || raw.len() as u64 != expected_bytes
+            || !raw.is_ascii()
+            || raw.contains(&0)
+        {
+            return Err(GpuError("prebuilt PTX byte admission".into()));
+        }
+        let sha256: [u8; 32] = Sha256::digest(&raw).into();
+        if sha256 != expected_sha256 {
+            return Err(GpuError("prebuilt PTX identity mismatch".into()));
+        }
+        let text = String::from_utf8(raw).map_err(|_| GpuError("prebuilt PTX encoding".into()))?;
+        validate_g1_ptx_signature(&text)?;
+        Ok(Self { text, sha256 })
+    }
+
+    /// Digest of the exact bytes transferred to the driver JIT.
+    pub fn sha256(&self) -> [u8; 32] {
+        self.sha256
+    }
+
+    /// Length of the exact bounded text owned until module loading completes.
+    pub fn bytes(&self) -> usize {
+        self.text.len()
+    }
+}
+
+fn validate_g1_ptx_signature(text: &str) -> Result<(), GpuError> {
+    let bad = || GpuError("prebuilt PTX target or 80-byte entry ABI".into());
+    if !text.is_ascii() || text.len() > MAX_PREBUILT_PTX_BYTES {
+        return Err(bad());
+    }
+    let mut lexer = PtxLexer { text, at: 0 };
+    let mut previous = None;
+    let mut targets = 0;
+    let mut entries = 0;
+    while let Some(token) = lexer.next()? {
+        if token == PtxToken::Word(".target") {
+            if lexer.next()? != Some(PtxToken::Word("sm_80")) {
+                return Err(bad());
+            }
+            targets += 1;
+        } else if token == PtxToken::Word(".entry") {
+            let name = lexer.next()?.ok_or_else(bad)?;
+            if name == PtxToken::Word(G1_PTX_ENTRY) {
+                if previous != Some(PtxToken::Word(".visible"))
+                    || lexer.next()? != Some(PtxToken::Punctuation(b'('))
+                {
+                    return Err(bad());
+                }
+                entries += 1;
+                let start = lexer.at;
+                let mut count = 0;
+                loop {
+                    if lexer.at - start > 4096
+                        || lexer.next()? != Some(PtxToken::Word(".param"))
+                        || lexer.next()? != Some(PtxToken::Word(".u64"))
+                    {
+                        return Err(bad());
+                    }
+                    if matches!(count, 0 | 2 | 7 | 8)
+                        && (lexer.next()? != Some(PtxToken::Word(".ptr"))
+                            || lexer.next()? != Some(PtxToken::Word(".align"))
+                            || lexer.next()? != Some(PtxToken::Word("1")))
+                    {
+                        return Err(bad());
+                    }
+                    let Some(PtxToken::Word(name)) = lexer.next()? else {
+                        return Err(bad());
+                    };
+                    if name.is_empty()
+                        || name.len() > 128
+                        || !name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+                    {
+                        return Err(bad());
+                    }
+                    count += 1;
+                    match lexer.next()? {
+                        Some(PtxToken::Punctuation(b',')) if count < 10 => {}
+                        Some(PtxToken::Punctuation(b')')) if count == 10 => break,
+                        _ => return Err(bad()),
+                    }
+                }
+            }
+        }
+        previous = Some(token);
+    }
+    if targets != 1 || entries != 1 {
+        return Err(bad());
+    }
+    // This is a structural entry ABI check, not an instruction/atomic proof.
+    // The independent artifact gate supplies the named-entry semantic proof.
+    Ok(())
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PtxToken<'text> {
+    Word(&'text str),
+    Punctuation(u8),
+    Quoted,
+}
+
+/// One forward bounded scan; comments/quoted filenames cannot invent an entry.
+struct PtxLexer<'text> {
+    text: &'text str,
+    at: usize,
+}
+
+impl<'text> PtxLexer<'text> {
+    fn next(&mut self) -> Result<Option<PtxToken<'text>>, GpuError> {
+        let raw = self.text.as_bytes();
+        let bad = || GpuError("unterminated prebuilt PTX lexical field".into());
+        while self.at < raw.len() {
+            if raw[self.at].is_ascii_whitespace() {
+                self.at += 1;
+                continue;
+            }
+            if raw.get(self.at..self.at + 2) == Some(b"//") {
+                self.at += 2;
+                while self.at < raw.len() && raw[self.at] != b'\n' {
+                    self.at += 1;
+                }
+                continue;
+            }
+            if raw.get(self.at..self.at + 2) == Some(b"/*") {
+                self.at += 2;
+                while self.at < raw.len() && raw.get(self.at..self.at + 2) != Some(b"*/") {
+                    self.at += 1;
+                }
+                if self.at == raw.len() {
+                    return Err(bad());
+                }
+                self.at += 2;
+                continue;
+            }
+            if raw[self.at] == b'"' {
+                self.at += 1;
+                loop {
+                    let byte = *raw.get(self.at).ok_or_else(bad)?;
+                    self.at += 1;
+                    if byte == b'"' {
+                        break;
+                    }
+                    if byte == b'\\' {
+                        raw.get(self.at).ok_or_else(bad)?;
+                        self.at += 1;
+                    }
+                }
+                return Ok(Some(PtxToken::Quoted));
+            }
+            let word = |byte: u8| byte.is_ascii_alphanumeric() || b"_.$".contains(&byte);
+            if word(raw[self.at]) {
+                let first = self.at;
+                while self.at < raw.len() && word(raw[self.at]) {
+                    self.at += 1;
+                }
+                return Ok(Some(PtxToken::Word(&self.text[first..self.at])));
+            }
+            let byte = raw[self.at];
+            self.at += 1;
+            return Ok(Some(PtxToken::Punctuation(byte)));
+        }
+        Ok(None)
+    }
+}
+
+/// Conservative simultaneous device allocation model for one bounded G1 tile.
+///
+/// Host scope/file-cache/opaque driver admission remains the adapter's separate
+/// obligation before `open`. These are VRAM terms, not a host-RAM fit claim.
+#[derive(Clone, Copy, Debug)]
+pub struct DeviceAdmission {
+    payload_bytes: u64,
+    padded_threads: u32,
+}
+
+impl DeviceAdmission {
+    /// Creates a bounded payload/local-memory reservation without device calls.
+    ///
+    /// # Errors
+    /// Rejects payloads above40MiB or a nonzero thread count not padded to the
+    /// fixed128-thread block size, or beyond one65,536-query tile.
+    pub fn new(payload_bytes: u64, padded_threads: u32) -> Result<Self, GpuError> {
+        if payload_bytes > 40 << 20
+            || padded_threads > 65_536
+            || !padded_threads.is_multiple_of(128)
+        {
+            return Err(GpuError("prebuilt PTX device admission".into()));
+        }
+        Ok(Self {
+            payload_bytes,
+            padded_threads,
+        })
+    }
+
+    fn required_vram(self) -> Result<u64, GpuError> {
+        self.payload_bytes
+            .checked_add(u64::from(self.padded_threads) * 256)
+            .and_then(|n| n.checked_add(256 << 20))
+            .and_then(|n| n.checked_add(64 << 20))
+            .ok_or_else(|| GpuError("prebuilt PTX VRAM arithmetic".into()))
+    }
+}
+
+/// Actual function and device observations, independent of host cgroup peaks.
+#[derive(Clone, Copy, Debug)]
+pub struct PtxDeviceStats {
+    pub free_device_bytes_after_load: usize,
+    pub total_device_bytes: usize,
+    pub local_bytes_per_thread: u32,
+    pub registers_per_thread: u32,
+    pub shared_bytes_per_block: u32,
+    pub reserved_vram_bytes: u64,
+}
+
+/// One foreground driver-only context, stream and hash-bound prebuilt module.
+///
+/// Unlike [`device`], this owns no global cache and does not probe NVRTC, compile
+/// CUDA C, or run the existing NVRTC self-test. Source/protocol authorization and
+/// a separately hash-bound driver-only self-test remain required adapter gates.
+pub struct PtxDevice {
+    ctx: Arc<CudaContext>,
+    stream: Arc<CudaStream>,
+    _module: Arc<CudaModule>,
+    function: CudaFunction,
+    description: String,
+    stats: PtxDeviceStats,
+}
+
+impl std::fmt::Debug for PtxDevice {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PtxDevice")
+            .field("description", &self.description)
+            .field("stats", &self.stats)
+            .finish_non_exhaustive()
+    }
+}
+
+impl PtxDevice {
+    /// Creates an owned native context only after pure artifact admission.
+    ///
+    /// # Errors
+    /// Returns unavailable/driver errors or rejects capability, actual local
+    /// storage, block size or free-VRAM observations. Never selects CPU fallback.
+    pub fn open(ptx: VerifiedPtx, admission: DeviceAdmission) -> Result<Self, GpuError> {
+        let required = admission.required_vram()?;
+        if std::env::var_os("CUDA_CACHE_DISABLE").as_deref() != Some(std::ffi::OsStr::new("1")) {
+            return Err(GpuError(
+                "prebuilt PTX requires recorded CUDA_CACHE_DISABLE=1".into(),
+            ));
+        }
+        // SAFETY: this only probes the driver shared library; no NVRTC symbol is
+        // accessed. The complete host resource and artifact proof precedes it.
+        if !unsafe { cudarc::driver::sys::is_culib_present() } {
+            return Err(GpuError("CUDA driver library (libcuda) not found".into()));
+        }
+        let ctx = CudaContext::new(0)?;
+        let (major, minor) = ctx.compute_capability()?;
+        if major < 8 {
+            return Err(GpuError("prebuilt G1 PTX requires sm_80 or later".into()));
+        }
+        let description = format!("{} (sm_{major}{minor})", ctx.name()?);
+        let stream = ctx.new_stream()?;
+        let module = ctx.load_module(Ptx::from_src(ptx.text))?;
+        let function = module.load_function(G1_PTX_ENTRY)?;
+        let local = u32::try_from(function.local_size_bytes()?)
+            .map_err(|_| GpuError("negative CUDA local size".into()))?;
+        let registers = u32::try_from(function.num_regs()?)
+            .map_err(|_| GpuError("negative CUDA register count".into()))?;
+        let shared = u32::try_from(function.shared_size_bytes()?)
+            .map_err(|_| GpuError("negative CUDA shared size".into()))?;
+        if local > 256 || shared != 0 || function.max_threads_per_block()? < 128 {
+            return Err(GpuError(
+                "prebuilt PTX actual function memory or block bound".into(),
+            ));
+        }
+        ctx.bind_to_thread()?;
+        let (free, total) = cudarc::driver::result::mem_get_info()?;
+        if u64::try_from(free).map_err(|_| GpuError("CUDA free memory width".into()))? < required {
+            return Err(GpuError("prebuilt PTX free VRAM admission".into()));
+        }
+        Ok(Self {
+            ctx,
+            stream,
+            _module: module,
+            function,
+            description,
+            stats: PtxDeviceStats {
+                free_device_bytes_after_load: free,
+                total_device_bytes: total,
+                local_bytes_per_thread: local,
+                registers_per_thread: registers,
+                shared_bytes_per_block: shared,
+                reserved_vram_bytes: required,
+            },
+        })
+    }
+
+    pub fn describe(&self) -> &str {
+        &self.description
+    }
+    pub fn stats(&self) -> PtxDeviceStats {
+        self.stats
+    }
+    pub fn stream(&self) -> &Arc<CudaStream> {
+        &self.stream
+    }
+    pub fn function(&self) -> &CudaFunction {
+        &self.function
+    }
+
+    /// Synchronizes while the owned context/module remain alive.
+    pub fn sync(&self) -> Result<(), GpuError> {
+        Ok(self.stream.synchronize()?)
+    }
+
+    /// Explicit timed synchronization before releasing this foreground owner.
+    pub fn close(self) -> Result<(), GpuError> {
+        self.ctx.bind_to_thread()?;
+        self.sync()
+    }
+}
+
 /// Source of the device self-test kernel: `y[i] = 2 x[i] + 1` for `i < n`.
 const SELF_TEST_SRC: &str = r#"
 extern "C" __global__ void self_test(const float* x, float* y, unsigned n) {
@@ -289,6 +652,82 @@ pub fn self_test(dev: &Device) -> Result<(), GpuError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn entry() -> String {
+        let parameters = (0..10)
+            .map(|index| {
+                let pointer = if matches!(index, 0 | 2 | 7 | 8) {
+                    " .ptr .align 1"
+                } else {
+                    ""
+                };
+                format!(".param .u64{pointer} arg_{index}")
+            })
+            .collect::<Vec<_>>()
+            .join(",\n");
+        format!(".visible .entry {G1_PTX_ENTRY}({parameters}) {{ ret; }}\n")
+    }
+
+    fn verify_text(text: &str) -> Result<VerifiedPtx, GpuError> {
+        use sha2::{Digest, Sha256};
+        VerifiedPtx::verify(
+            text.as_bytes().to_vec(),
+            text.len() as u64,
+            Sha256::digest(text.as_bytes()).into(),
+        )
+    }
+
+    #[test]
+    fn prebuilt_ptx_identity_and_structural_entry_are_checked_without_device() {
+        let text = format!(".version 8.0\n.target sm_80\n.address_size 64\n{}", entry());
+        let checked = verify_text(&text).expect("bounded structural artifact");
+        assert_eq!(checked.bytes(), text.len());
+        assert!(VerifiedPtx::verify(text.into_bytes(), 1, [0; 32]).is_err());
+    }
+
+    #[test]
+    fn comments_and_quoted_paths_cannot_supply_an_entry() {
+        let fake = entry();
+        assert!(verify_text(&format!(".target sm_80\n/* {fake} */")).is_err());
+        assert!(verify_text(&format!(".target sm_80\n.file 1 {fake:?}\n")).is_err());
+        assert!(verify_text(&format!(".target sm_80\n// {}", fake.replace('\n', " "))).is_err());
+        let valid = format!(
+            ".target sm_80\n{}",
+            entry().replace(".visible", ".visible /* ignored */")
+        );
+        assert!(verify_text(&valid).is_ok());
+    }
+
+    #[test]
+    fn prebuilt_ptx_rejects_ambiguous_widths_entries_and_lexical_tails() {
+        let valid = format!(".target sm_80\n{}", entry());
+        assert!(verify_text(&valid.replace(".u64 arg_9", ".u32 arg_9")).is_err());
+        assert!(verify_text(&valid.replace(".align 1", ".align 8")).is_err());
+        assert!(verify_text(&format!("{valid}{}", entry())).is_err());
+        assert!(verify_text(&valid.replace("sm_80", "sm_70")).is_err());
+        assert!(verify_text(&format!("{valid}/* unterminated")).is_err());
+        assert!(verify_text(&format!("{valid}\"unterminated")).is_err());
+    }
+
+    #[test]
+    fn prebuilt_ptx_capacity_is_admitted_before_hash_or_context() {
+        let mut excess = Vec::with_capacity(MAX_PREBUILT_PTX_BYTES + 1);
+        excess.push(b';');
+        let error = VerifiedPtx::verify(excess, 1, [0; 32]).expect_err("excess live capacity");
+        assert_eq!(error.to_string(), "prebuilt PTX byte admission");
+    }
+
+    #[test]
+    fn device_model_counts_padded_threads_and_keeps_vram_separate() {
+        let admitted = DeviceAdmission::new(40 << 20, 65_536).expect("maximum bounded tile");
+        assert_eq!(
+            admitted.required_vram().expect("bounded arithmetic"),
+            376 << 20
+        );
+        assert!(DeviceAdmission::new(40 << 20, 127).is_err());
+        assert!(DeviceAdmission::new((40 << 20) + 1, 128).is_err());
+        assert!(DeviceAdmission::new(0, 65_664).is_err());
+    }
 
     // COMPUTE-REQ-0004: every W0 device item keeps its signature and every additive item is
     // callable with its specified signature.
