@@ -264,6 +264,17 @@ impl<'a> Scanner<'a> {
                 Some(b'/') if matches!(self.peek_at(1), Some(b'*' | b'/')) => {
                     self.skip_ws(true)?;
                 }
+                // Liberty permits unquoted bus slices, e.g. pin(A[9:0]). A colon
+                // outside brackets remains a syntax error rather than consuming
+                // an attribute delimiter as part of an argument.
+                Some(b':')
+                    if text
+                        .rsplit_once('[')
+                        .is_some_and(|(_, tail)| !tail.contains(']')) =>
+                {
+                    text.push(':');
+                    self.bump();
+                }
                 Some(b) if is_word_byte(b) => text.push_str(&self.word()),
                 Some(b) => {
                     return Err(

@@ -427,7 +427,11 @@ impl Builder<'_> {
             always_on: self.flag(c, CELL, "always_on"),
             cell_footprint: c.simple("cell_footprint").map(str::to_string),
             dont_touch: self.flag(c, CELL, "dont_touch"),
-            is_macro_cell: self.flag(c, CELL, "is_macro_cell"),
+            // A Liberty memory is necessarily opaque to Boolean technology
+            // mapping. Its timing interface is still imported; unsupported
+            // behavioral memory declarations retain classifier diagnostics.
+            is_macro_cell: self.flag(c, CELL, "is_macro_cell")
+                || c.children("memory").next().is_some(),
             pad_cell: self.flag(c, CELL, "pad_cell"),
             switch_cell_type: self.named(
                 c,

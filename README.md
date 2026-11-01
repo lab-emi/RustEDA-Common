@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/assets/rusteda-common-wordmark.svg" alt="RustEDA Common" width="440"></p>
+<p align="center"><img src="docs/assets/rusteda-common-wordmark.svg" alt="RustEDA Common" width="360"></p>
 
 <h1 align="center">The foundation beneath the design loop.</h1>
 
@@ -6,7 +6,7 @@
 
 <picture>
 <source media="(prefers-reduced-motion: reduce)" srcset="docs/assets/rusteda-common-banner.svg">
-<img src="docs/assets/rusteda-common-banner.gif" alt="Shared models, formats, disk workspaces and compute for RustEDA" width="1200" height="360">
+<img src="docs/assets/rusteda-common-banner.gif" alt="Shared models, formats, disk workspaces and compute for RustEDA" width="1200">
 </picture>
 
 The single implementation source for the shared RustEDA foundation:
@@ -34,3 +34,14 @@ cargo test -p rusteda-compute --features cuda
 
 Optional GPU and external-oracle checks are not implied by CPU test success.
 The core crates have no Python or GUI dependency. See the [development guide](https://lab-emi.github.io/RustEDA/development/).
+
+
+## Latest development · 2026-11-01
+
+The foundation now includes the IHP/SRAM interface work used by the qualified
+Ibex flow: Liberty memory buses and pin metadata, explicit driving-cell
+constraints, escaped mapped-netlist identifiers, and bounded connectivity
+exports. The deterministic CPU RC charge-fitting implementation uses `f64`.
+
+[Current source and qualification](docs/development-status.md) ·
+[Latest complete-flow evidence](https://lab-emi.github.io/RustEDA/benchmarks/)

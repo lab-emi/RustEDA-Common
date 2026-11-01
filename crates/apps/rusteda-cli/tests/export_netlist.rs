@@ -89,6 +89,97 @@ library (synth) {
 }
 "#;
 
+/// Native JSON is a pure, bounded mmap query; no external parser is invoked.
+#[test]
+fn native_connectivity_json_preserves_aliases_and_atomic_budget_failure() {
+    let root = temp_dir("connectivity");
+    let ws = root.join("ws");
+    let ws_s = ws.to_str().unwrap();
+    assert_eq!(run_json(&["init", "-w", ws_s]).0, 0);
+    let lib = root.join("cells.lib");
+    fs::write(&lib, SYNTH_LIB).unwrap();
+    let net = root.join("top.v");
+    fs::write(&net, "module top(input [0:1] a,output [9:8] y); wire [5:4] alias_link; INVX1 u0(.A(a[0]),.Y(alias_link[5])); INVX1 u1(.A(a[1]),.Y(alias_link[4])); assign y=alias_link; endmodule\n").unwrap();
+    let (code, env, _) = run_json(&[
+        "import",
+        "-w",
+        ws_s,
+        "--base-rev",
+        "rev0",
+        "--lib",
+        lib.to_str().unwrap(),
+        "--netlist",
+        net.to_str().unwrap(),
+    ]);
+    assert_eq!(code, 0, "{env}");
+    let before = fs::read(ws.join("manifest.json")).unwrap();
+    let history = fs::read(ws.join("history.jsonl")).unwrap();
+    let out = root.join("graph.json");
+    let (code, env, _) = run_json(&[
+        "export",
+        "-w",
+        ws_s,
+        "--netlist",
+        out.to_str().unwrap(),
+        "--kind",
+        "connectivity-json",
+    ]);
+    assert_eq!(code, 0, "{env}");
+    let json: Value = serde_json::from_slice(&fs::read(&out).unwrap()).unwrap();
+    let top = &json["modules"]["top"];
+    assert_eq!(top["ports"]["a"]["upto"], 1);
+    assert_eq!(top["ports"]["y"]["offset"], 8);
+    assert_eq!(
+        top["cells"]["u0"]["connections"]["A"][0],
+        top["ports"]["a"]["bits"][1]
+    );
+    assert_eq!(
+        top["cells"]["u0"]["connections"]["Y"][0],
+        top["ports"]["y"]["bits"][1]
+    );
+    assert_eq!(
+        top["netnames"]["alias_link"]["bits"],
+        top["ports"]["y"]["bits"]
+    );
+    assert_eq!(env["export_kind"], "connectivity-json");
+    assert!(env["table_hash"].as_str().unwrap().starts_with("xxh3:"));
+    assert_eq!(
+        env["output_hash"],
+        rusteda_workspace::hash::hash_file(&out)
+            .unwrap()
+            .to_string()
+    );
+    assert!(env["budgets"]["estimated_aux_bytes"].as_u64().unwrap() <= 67_108_864);
+    assert_eq!(fs::read(ws.join("manifest.json")).unwrap(), before);
+    assert_eq!(fs::read(ws.join("history.jsonl")).unwrap(), history);
+    let original = fs::read(&out).unwrap();
+    let (code, env, _) = run_json(&[
+        "export",
+        "-w",
+        ws_s,
+        "--netlist",
+        out.to_str().unwrap(),
+        "--kind",
+        "connectivity-json",
+        "--connectivity-max-output-bytes",
+        "1",
+    ]);
+    assert_ne!(code, 0, "{env}");
+    assert!(env.to_string().contains("CONNECTIVITY_BUDGET"));
+    assert_eq!(
+        fs::read(&out).unwrap(),
+        original,
+        "failed query must retain the prior output"
+    );
+    assert!(
+        !fs::read_dir(&root).unwrap().any(|e| e
+            .unwrap()
+            .file_name()
+            .to_string_lossy()
+            .ends_with(".tmp"))
+    );
+}
+
 /// RCLI-REQ-0016, RCLI-REQ-0020: `rusteda export --netlist` writes a structural Verilog file that
 /// round-trips through `rusteda import --netlist` with exact `FrozenNetlist` equality, and is a
 /// pure query (does not advance `current` or log to `history.jsonl`).

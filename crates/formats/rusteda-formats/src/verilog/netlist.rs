@@ -86,6 +86,34 @@ pub use freeze_writer::{FrozenBuildLimits, to_frozen_netlist};
 
 pub use read::read_structural;
 
+/// Scalar pins of a bracket-named bus, in the supplied library declaration
+/// order. Only a contiguous ascending or descending range is accepted.
+pub fn pin_group<'a>(pins: impl Iterator<Item = (u32, &'a str)>, name: &str) -> Option<Vec<u32>> {
+    let prefix = format!("{name}[");
+    let mut result = Vec::new();
+    let mut previous: Option<i64> = None;
+    let mut step = None;
+    for (id, pin) in pins {
+        let Some(index) = pin.strip_prefix(&prefix).and_then(|s| s.strip_suffix(']')) else {
+            continue;
+        };
+        let index = index.parse::<i64>().ok()?;
+        if let Some(previous) = previous {
+            let delta = index.checked_sub(previous)?;
+            if !matches!(delta, -1 | 1) || step.is_some_and(|s| s != delta) {
+                return None;
+            }
+            step = Some(delta);
+        }
+        if result.len() >= MAX_RANGE_WIDTH as usize {
+            return None;
+        }
+        previous = Some(index);
+        result.push(id);
+    }
+    (!result.is_empty()).then_some(result)
+}
+
 /// A conversion that the target model cannot represent.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConvertError {
@@ -385,6 +413,20 @@ impl<'c, 's> Builder<'c, 's> {
         c.pins.iter().position(|p| p.name == s).map(|k| k as u32)
     }
 
+    fn pin_indices(&self, cell: CellId, pin: &str) -> Option<Vec<u32>> {
+        if let Some(index) = self.pin_index(cell, pin) {
+            return Some(vec![index]);
+        }
+        let cell = self.g.cell(cell).ok()?;
+        pin_group(
+            cell.pins
+                .iter()
+                .enumerate()
+                .map(|(i, p)| (i as u32, self.g.resolve(p.name))),
+            pin,
+        )
+    }
+
     /// All bits of a name. An undeclared name becomes an implicit scalar wire when `implicit`.
     fn whole(&mut self, name: &str, implicit: bool, at: Span) -> Result<Vec<Conn>, String> {
         match self.names.get(name) {
@@ -507,19 +549,30 @@ pub fn to_gate_netlist(
         let id = b.instance(&inst.name, cell, at).map_err(ctx)?;
         let mut connected = HashSet::new();
         for (pin, r) in &inst.conns {
-            let k = b
-                .pin_index(cell, pin)
+            let indices = b
+                .pin_indices(cell, pin)
                 .ok_or_else(|| ctx(format!("cell '{}' has no pin '{pin}'", inst.cell)))?;
-            if !connected.insert(k) {
+            if indices.iter().any(|&k| !connected.insert(k)) {
                 return Err(ctx(format!("pin '{pin}' is connected twice")));
             }
             let bits = writer_bits(&mut b, r, true).map_err(ctx)?;
-            let [c] = bits[..] else {
-                let n = bit_count(bits.len());
-                return Err(ctx(format!("pin '{pin}' is connected to {n}")));
-            };
-            b.g.connect(id, PinRef::Index(k), c)
-                .map_err(|e| ctx(e.to_string()))?;
+            if bits.len() != indices.len() {
+                if indices.len() == 1 {
+                    return Err(ctx(format!(
+                        "pin '{pin}' is connected to {}",
+                        bit_count(bits.len())
+                    )));
+                }
+                return Err(ctx(format!(
+                    "pin '{pin}' takes {} bits, got {}",
+                    indices.len(),
+                    bit_count(bits.len())
+                )));
+            }
+            for (k, c) in indices.into_iter().zip(bits) {
+                b.g.connect(id, PinRef::Index(k), c)
+                    .map_err(|e| ctx(e.to_string()))?;
+            }
         }
     }
     for (l, r) in &m.assigns {

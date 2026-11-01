@@ -8,7 +8,7 @@ use std::collections::HashMap;
 #[cfg(test)]
 use std::fmt::Write as _;
 use std::fs::{self, OpenOptions};
-use std::io::{BufWriter, Write as _};
+use std::io::{BufWriter, Read as _, Write as _};
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -20,12 +20,38 @@ use rusteda_core::netlist::{Conn, GateNetlist, NetId, PortDir};
 use rusteda_formats::verilog::netlist::from_gate_netlist;
 #[cfg(test)]
 use rusteda_formats::verilog::write::{ident, write_netlist};
+use rusteda_workspace::hash::{Hash64, Hasher};
 use rusteda_workspace::text::next_line;
 use rusteda_workspace::{Envelope, Error, JsonObject, Workspace, netlist};
 
-use crate::OutputOutcome;
+use crate::{ExportArgs, ExportKind, OutputOutcome};
 
+mod connectivity;
 mod frozen;
+mod schema;
+
+struct Stream<W> {
+    inner: W,
+    hash: Hasher,
+    written: u64,
+    limit: u64,
+}
+impl<W: std::io::Write> std::io::Write for Stream<W> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        if bytes.len() as u64 > self.limit.saturating_sub(self.written) {
+            return Err(std::io::Error::other(
+                "CONNECTIVITY_BUDGET: output byte ceiling exceeded",
+            ));
+        }
+        let n = self.inner.write(bytes)?;
+        self.hash.update(&bytes[..n]);
+        self.written += n as u64;
+        Ok(n)
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
+}
 
 /// Formats a [`GateNetlist`] as structural Verilog text, using [`from_gate_netlist`] and
 /// [`write_netlist`] when the module uses `[w-1:0]` input/output ports and wires, and falling back
@@ -196,17 +222,22 @@ fn format_gate_netlist(g: &GateNetlist) -> Result<String, Error> {
 pub(crate) fn run_export(
     ws: &Workspace,
     ws_arg: &str,
-    rev_spec: &str,
-    out_file: &Path,
+    args: &ExportArgs,
 ) -> Result<OutputOutcome, Error> {
-    let rev = ws.resolve_query(rev_spec)?;
+    let rev = ws.resolve_query(&args.rev)?;
+    let out_file = &args.netlist;
     let revision = ws.revision(rev)?;
     let limits = frozen::Limits::default();
     let table_path = revision.table_path(netlist::TABLE_NAME)?;
+    let table_limit = if args.kind == ExportKind::ConnectivityJson {
+        128 * 1024 * 1024
+    } else {
+        limits.max_table_bytes
+    };
     if fs::metadata(&table_path)
         .map_err(|e| Error::io(&table_path, e))?
         .len()
-        > limits.max_table_bytes
+        > table_limit
     {
         return Err(Error::input_rejected(
             "EXPORT_BUDGET: netlist table exceeds the export byte limit",
@@ -214,7 +245,50 @@ pub(crate) fn run_export(
     }
     let rbin = netlist::open_rev(&revision)?;
     let f = netlist::decode(&rbin)?;
-    let plan = frozen::Plan::new(&f, limits)?;
+    let mut schemas = frozen::CellBusSchemas::new();
+    let mut schema_hash = None;
+    if let Some(path) = args.cell_buses.as_deref() {
+        const MAX_SCHEMA_BYTES: u64 = 2 * 1024 * 1024;
+        let file = fs::File::open(path).map_err(|e| Error::io(path, e))?;
+        if !file.metadata().map_err(|e| Error::io(path, e))?.is_file() {
+            return Err(Error::input_rejected(
+                "CELL_BUS_SCHEMA: expected a regular JSON file",
+            ));
+        }
+        let mut bytes = Vec::new();
+        file.take(MAX_SCHEMA_BYTES + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|e| Error::io(path, e))?;
+        if bytes.len() as u64 > MAX_SCHEMA_BYTES {
+            return Err(Error::input_rejected("CELL_BUS_SCHEMA: JSON exceeds 2 MiB"));
+        }
+        schema_hash = Some(Hash64::of(&bytes));
+        schemas = schema::parse(&bytes)
+            .map_err(|e| Error::input_rejected(format!("CELL_BUS_SCHEMA: {e}")))?;
+    }
+
+    let mut verilog = None;
+    let mut graph = None;
+    match args.kind {
+        ExportKind::Verilog => {
+            let mut plan = frozen::Plan::new(&f, limits)?;
+            if !schemas.is_empty() {
+                plan.set_cell_buses(&schemas)?;
+            }
+            verilog = Some(plan);
+        }
+        ExportKind::ConnectivityJson => {
+            graph = Some(connectivity::Plan::new(
+                &f,
+                &schemas,
+                connectivity::Limits {
+                    aux_bytes: args.connectivity_max_aux_bytes,
+                    output_bytes: args.connectivity_max_output_bytes,
+                    work: args.connectivity_max_work,
+                },
+            )?);
+        }
+    }
 
     if let Some(parent) = out_file.parent() {
         if !parent.as_os_str().is_empty() {
@@ -238,11 +312,21 @@ pub(crate) fn run_export(
         .create_new(true)
         .open(&pending)
         .map_err(|e| Error::io(&pending, e))?;
-    let mut writer = BufWriter::with_capacity(1024 * 1024, file);
-    let written = plan
-        .write(&mut writer)
-        .and_then(|()| writer.flush())
-        .and_then(|()| writer.get_ref().sync_all());
+    let mut writer = Stream {
+        inner: BufWriter::with_capacity(1024 * 1024, file),
+        hash: Hasher::new(),
+        written: 0,
+        limit: graph.as_ref().map_or(u64::MAX, |plan| plan.output_limit),
+    };
+    let written = match (&verilog, &graph) {
+        (Some(plan), _) => plan.write(&mut writer),
+        (_, Some(plan)) => plan.write(&mut writer),
+        _ => unreachable!("export kind has a validated plan"),
+    }
+    .and_then(|()| writer.flush())
+    .and_then(|()| writer.inner.get_ref().sync_all());
+    let output_bytes = writer.written;
+    let output_hash = writer.hash.finish();
     drop(writer);
     if let Err(e) = written {
         let _ = fs::remove_file(&pending);
@@ -266,6 +350,28 @@ pub(crate) fn run_export(
 
     env.set("table", &netlist::TABLE_NAME)?;
     env.set("output", &out_str)?;
+    env.set("table_hash", &rbin.file_hash())?;
+    env.set("output_hash", &output_hash)?;
+    env.set("output_bytes", &output_bytes)?;
+    env.set("cell_buses_hash", &schema_hash)?;
+    env.set("sources", &revision.meta().sources)?;
+    env.set(
+        "export_kind",
+        &if graph.is_some() {
+            "connectivity-json"
+        } else {
+            "verilog"
+        },
+    )?;
+    if let Some(plan) = graph {
+        let mut budget = JsonObject::new();
+        budget.insert("estimated_aux_bytes", &plan.estimated_aux_bytes)?;
+        budget.insert("work_used", &plan.work_used)?;
+        budget.insert("max_aux_bytes", &args.connectivity_max_aux_bytes)?;
+        budget.insert("max_output_bytes", &args.connectivity_max_output_bytes)?;
+        budget.insert("max_work", &args.connectivity_max_work)?;
+        env.set("budgets", &budget)?;
+    }
 
     let rev_s = rev.to_string();
     env.push_next_action(&["rusteda", "show", "-w", ws_arg, "--rev", &rev_s]);
