@@ -26,6 +26,7 @@ pub(super) mod code {
     pub(crate) const NOT_A_NUMBER: &str = "L0111";
     /// A timing group without a related pin.
     pub(crate) const NO_RELATED_PIN: &str = "L0112";
+    pub(crate) const OPAQUE_MEMORY: &str = "L0113";
     /// Cell problems (LIBERTY-REQ-0057): each one marks its cell unusable.
     pub(crate) const BAD_DIRECTION: &str = "L0200";
     pub(crate) const BAD_FUNCTION: &str = "L0201";
@@ -53,6 +54,9 @@ fn help(code: &str) -> Option<&'static str> {
         code::UNKNOWN_VALUE => "the value is kept as written but has no known meaning",
         code::NOT_A_NUMBER => "the attribute takes its default value",
         code::NO_RELATED_PIN => "the timing group produces no timing arc",
+        code::OPAQUE_MEMORY => {
+            "memory state is opaque; use its original macro implementation for functional verification"
+        }
         c if c.starts_with("L02") => "cells with problems are marked unusable",
         _ => return None,
     })

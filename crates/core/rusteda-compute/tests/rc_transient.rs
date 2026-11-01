@@ -153,3 +153,96 @@ fn simulator_wire_thresholds() {
         assert!(de < 1e-6 && se < 1e-6);
     }
 }
+
+// STA-REQ-0733, STA-REQ-0734: independent ODE solution of the output-charge interval,
+// followed by a separate simulation of the source fitted at that effective load.
+// Ten sequential four-node circuits, <=200k time points/circuit, estimated <64 MiB RSS.
+#[test]
+#[ignore = "requires RUSTEDA_SPICE_SIMULATOR and a fresh RUSTEDA_RC_CHARGE_WORKSPACE, with OS caps"]
+fn simulator_output_charge_interval_and_waveform() {
+    let tool = PathBuf::from(std::env::var("RUSTEDA_SPICE_SIMULATOR").expect("external simulator"));
+    let root = PathBuf::from(
+        std::env::var("RUSTEDA_RC_CHARGE_WORKSPACE").expect("fresh evidence workspace"),
+    );
+    fs::create_dir(&root).unwrap();
+    for (case, (rpi, lower, upper, derate)) in [
+        (0.01, 0.2, 0.8, 1.0),
+        (1.0, 0.2, 0.8, 1.0),
+        (20.0, 0.2, 0.8, 1.0),
+        (0.1, 0.3, 0.7, 0.5),
+        (5.0, 0.3, 0.7, 0.5),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let pi = Pi {
+            near: 0.01,
+            far: 0.02,
+            resistance: rpi,
+        };
+        let t = Thresholds {
+            lower,
+            upper,
+            input: 0.5,
+            output: 0.5,
+            derate,
+        };
+        let law = |c: f64| (0.05 + 2.0 * c, 0.3 + 3.0 * c);
+        let rd = 2.0 * std::f64::consts::LN_2;
+        let response = rc::charge::gate(pi, t, rd, law).unwrap();
+        let charge_interval = law(response.capacitance).1 * derate / (upper - lower);
+        let (wire_delay, far_slew) =
+            rc::wire_from_driver(pi, rd, response.duration, rpi * pi.far, t).unwrap();
+        for (label, duration) in [("charge", charge_interval), ("waveform", response.duration)] {
+            let end = 0.1 + duration;
+            let stop = end + 30.0 * (rd * pi.total() + rpi * pi.far);
+            let path = root.join(format!("case{case}-{label}.cir"));
+            let log = root.join(format!("case{case}-{label}.log"));
+            fs::write(&path, format!("bounded charge interval and driver waveform\nVsrc src 0 PWL(0 0 0.1n 0 {end}n 1)\nRd src root {rd}\nRp root far {rp}\nCn root 0 {cn}p\nCf far 0 {cf}p\nRn src nominal {rd}\nCnom nominal 0 {ce}p\n.control\nset numdgt=16\ntran {step}n {stop}n\nmeas tran rlo WHEN v(root)={lower} RISE=1\nmeas tran rmid WHEN v(root)=0.5 RISE=1\nmeas tran rhi WHEN v(root)={upper} RISE=1\nmeas tran flo WHEN v(far)={lower} RISE=1\nmeas tran fmid WHEN v(far)=0.5 RISE=1\nmeas tran fhi WHEN v(far)={upper} RISE=1\nmeas tran nlo WHEN v(nominal)={lower} RISE=1\nmeas tran nmid WHEN v(nominal)=0.5 RISE=1\nmeas tran vr FIND v(root) AT={end}n\nmeas tran vf FIND v(far) AT={end}n\nmeas tran vn FIND v(nominal) AT={end}n\nprint rlo rmid rhi flo fmid fhi nlo nmid vr vf vn\nquit\n.endc\n.end\n",rd=rd*1000.0,rp=rpi*1000.0,cn=pi.near,cf=pi.far,ce=response.capacitance,step=stop/200000.0)).unwrap();
+            let file = fs::File::create(&log).unwrap();
+            let status = Command::new("timeout")
+                .args(["--kill-after=2s", "35s"])
+                .arg(&tool)
+                .args(["-b"])
+                .arg(path)
+                .stdin(Stdio::null())
+                .stdout(Stdio::from(file.try_clone().unwrap()))
+                .stderr(Stdio::from(file))
+                .status()
+                .unwrap();
+            assert!(
+                status.success(),
+                "external transient failed: {}",
+                log.display()
+            );
+            assert!(fs::metadata(&log).unwrap().len() < 1 << 20);
+            let m = measurements(&fs::read_to_string(&log).unwrap());
+            if label == "charge" {
+                let error =
+                    (response.capacitance * m["vn"] - pi.near * m["vr"] - pi.far * m["vf"]).abs();
+                fs::write(
+                    root.join(format!("case{case}-charge.metrics")),
+                    format!("charge_error_pf {error:e}\n"),
+                )
+                .unwrap();
+                assert!(error < 1e-8, "case{case}: {error:e}");
+            } else {
+                let errors = [
+                    (m["rmid"] * 1e9 - 0.1 - response.root_crossing).abs(),
+                    ((m["rhi"] - m["rlo"]) * 1e9 / derate - response.slew).abs(),
+                    ((m["nmid"] - m["nlo"]) * 1e9
+                        - law(response.capacitance).1 * derate * (0.5 - lower) / (upper - lower))
+                        .abs(),
+                    ((m["fmid"] - m["rmid"]) * 1e9 - wire_delay).abs(),
+                    ((m["fhi"] - m["flo"]) * 1e9 / derate - far_slew).abs(),
+                ];
+                fs::write(
+                    root.join(format!("case{case}-waveform.metrics")),
+                    format!("time_errors_ns {errors:?}\n"),
+                )
+                .unwrap();
+                assert!(errors.iter().all(|x| *x < 1e-5), "case{case}: {errors:?}");
+            }
+        }
+    }
+}
