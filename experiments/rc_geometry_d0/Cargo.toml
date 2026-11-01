@@ -1,0 +1,24 @@
+[package]
+name = "rusteda-rc-geometry-d0"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# Source-only experiment; do not join the production foundation workspace.
+[workspace]
+
+[features]
+cuda = ["dep:cudarc", "dep:sha2", "dep:serde_json"]
+
+[dependencies]
+rayon = "=1.12.0"
+cudarc = { version = "=0.19.10", optional = true, default-features = false, features = ["std", "driver", "nvrtc", "fallback-dynamic-loading", "cuda-version-from-build-system", "fallback-latest"] }
+sha2 = { version = "=0.10.9", optional = true }
+serde_json = { version = "=1.0.149", optional = true }
+
+[lints.rust]
+unsafe_code = "deny"
+
+[lints.clippy]
+all = "warn"

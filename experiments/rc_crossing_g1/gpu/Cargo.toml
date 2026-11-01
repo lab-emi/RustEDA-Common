@@ -1,0 +1,8 @@
+[package]
+name = "rusteda-g1-phase-a-device-placeholder"
+version = "0.1.0"
+edition = "2024"
+publish = false
+autobins = false
+
+[workspace]

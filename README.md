@@ -1,3 +1,17 @@
+# Experimental G1 CPU session snapshot
+
+This branch preserves the CPU session development independently of the later
+CPU/CUDA refactor. It adds the original bounded integer crossing-session source
+to the current production foundation. Existing component receipts keep their
+original ELF identities; this composite source publication is not a new runtime
+qualification or a production Road integration. GPU execution and whole-flow
+acceleration remain unchecked here.
+
+[Later CPU/CUDA session](https://github.com/lab-emi/RustEDA-Common/tree/codex/g1-crossing-session-20261101) ·
+[Production foundation](https://github.com/lab-emi/RustEDA-Common)
+
+---
+
 <p align="center"><img src="docs/assets/rusteda-common-wordmark.svg" alt="RustEDA Common" width="360"></p>
 
 <h1 align="center">The foundation beneath the design loop.</h1>
