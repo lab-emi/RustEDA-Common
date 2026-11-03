@@ -10,7 +10,7 @@ mod source;
 use serde::{Deserialize, Serialize};
 
 pub use parse::read;
-pub use source::{DecodedSource, SourceEncoding, decode_source};
+pub use source::{DecodedSource, SourceEncoding, decode_source, decode_source_owned};
 
 /// Hard parser budgets, retained with the imported source.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
