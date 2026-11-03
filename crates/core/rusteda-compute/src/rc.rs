@@ -840,28 +840,28 @@ fn wire_from_driver_impl(
     };
     let start = duration + poles.a + poles.b + tau;
     let root_out = root_out.unwrap_or_else(|| poles.crossing(duration, t.output));
-    let (sink_in, upper, lower) =
-        if da && db && replay::modelled(tau) && replay::monotone(poles.a, poles.b, w) {
-            // The same evaluation as `load`, with its slope.
-            let fs = |x: f64| {
-                let ((va, sa), (vb, sb), (vt, st)) =
-                    (ra.at_slope(x), rb.at_slope(x), rt.at_slope(x));
-                let ca = (poles.a * va - tau * vt) / (poles.a - tau);
-                let cb = (poles.b * vb - tau * vt) / (poles.b - tau);
-                let slope = w * ((poles.a * sa - tau * st) / (poles.a - tau))
-                    + (1.0 - w) * ((poles.b * sb - tau * st) / (poles.b - tau));
-                (w * ca + (1.0 - w) * cb, slope)
-            };
-            let error = replay::load_error(poles.a, poles.b, w, tau);
-            let sink_in = certified_crossing(load, fs, t.input, start, error, root_out + tau)?;
-            let upper = certified_crossing(load, fs, t.upper, start, error, sink_in)?;
-            let lower = certified_crossing(load, fs, t.lower, start, error, sink_in)?;
-            (sink_in, upper, lower)
-        } else {
-            let sink_in = monotone_crossing(load, t.input, start)?;
-            let upper = monotone_crossing(load, t.upper, start)?;
-            (sink_in, upper, monotone_crossing(load, t.lower, start)?)
+    // The replay's error model holds for distinct poles and parameters in its range.
+    let modelled = replay::modelled(duration) && replay::modelled(tau);
+    let (sink_in, upper, lower) = if da && db && modelled && replay::monotone(poles.a, poles.b, w) {
+        // The same evaluation as `load`, with its slope.
+        let fs = |x: f64| {
+            let ((va, sa), (vb, sb), (vt, st)) = (ra.at_slope(x), rb.at_slope(x), rt.at_slope(x));
+            let ca = (poles.a * va - tau * vt) / (poles.a - tau);
+            let cb = (poles.b * vb - tau * vt) / (poles.b - tau);
+            let slope = w * ((poles.a * sa - tau * st) / (poles.a - tau))
+                + (1.0 - w) * ((poles.b * sb - tau * st) / (poles.b - tau));
+            (w * ca + (1.0 - w) * cb, slope)
         };
+        let error = replay::load_error(poles.a, poles.b, w, tau);
+        let sink_in = certified_crossing(load, fs, t.input, start, error, root_out + tau)?;
+        let upper = certified_crossing(load, fs, t.upper, start, error, sink_in)?;
+        let lower = certified_crossing(load, fs, t.lower, start, error, sink_in)?;
+        (sink_in, upper, lower)
+    } else {
+        let sink_in = monotone_crossing(load, t.input, start)?;
+        let upper = monotone_crossing(load, t.upper, start)?;
+        (sink_in, upper, monotone_crossing(load, t.lower, start)?)
+    };
     let slew = (upper - lower) / t.derate;
     let delay = sink_in - root_out;
     if !delay.is_finite() || !slew.is_finite() {
@@ -1253,8 +1253,14 @@ mod tests {
                 resistance: log(next(), -3.0, 1.0),
             };
             let res = log(next(), -2.0, 1.5);
+            // Some durations lie outside the replay's error model, below 1e-30 or above 1e30
+            // (`replay::modelled`): those crossings take the plain bisections.
             let duration = if case % 17 == 0 {
                 0.0
+            } else if case % 29 == 1 {
+                log(next(), -34.0, -30.2)
+            } else if case % 31 == 2 {
+                log(next(), 30.2, 32.0)
             } else {
                 log(next(), -4.0, 0.0)
             };
