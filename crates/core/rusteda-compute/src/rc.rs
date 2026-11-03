@@ -729,17 +729,18 @@ fn certified_crossing(
     guess: f64,
 ) -> Result<f64, ComputeError> {
     let mut certificate = replay::Certificate::new(p, error);
+    // The evaluations of `monotone_crossing`'s doubling, recorded while they stay within the
+    // model (up to 1e30; beyond, nothing is replayed).
+    let mut eval = |x: f64| {
+        let v = f(x);
+        if x <= 1e30 {
+            certificate.record(x, v);
+        }
+        v
+    };
     let mut hi = start.max(1e-15);
     let mut doublings = 0;
-    loop {
-        let v = f(hi);
-        // Doubling stays within the model only up to 1e30; beyond, nothing is replayed.
-        if hi <= 1e30 {
-            certificate.record(hi, v);
-        }
-        if !(v < p) {
-            break;
-        }
+    while eval(hi) < p {
         hi *= 2.0;
         doublings += 1;
         if doublings > 64 || !hi.is_finite() {
