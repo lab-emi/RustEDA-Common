@@ -122,3 +122,64 @@ fn rejects_invalid_public_rc_models() {
     bad.nets[0].nodes[0].cap_pf = f64::INFINITY;
     assert!(bad.validate(Limits::default()).is_err());
 }
+
+// RCLI-REQ-0071, RCLI-REQ-0072: the counting parse reports the counts of the full parse and fails
+// exactly when it fails, with the same error, for valid, corrupt and over-budget sources.
+#[test]
+fn counting_parse_matches_the_full_parse() {
+    let two_nets = source().replace(
+        "*END\n",
+        "*END\n*D_NET *2 1\n*CONN\n*I *2:A I\n*CAP\n1 *2:A 1\n*END\n",
+    );
+    let mut texts = vec![
+        source(),
+        two_nets.clone(),
+        two_nets.replace("*D_NET *2", "*D_NET *1"),
+    ];
+    for (from, to) in [
+        ("*END", ""),
+        ("*D_NET", "*R_NET"),
+        ("1 a 1", "1 a NaN"),
+        ("*2:A I", "*99:A I"),
+        ("*CONN", "*INDUC"),
+        ("*1 a", "*1 a\n*1 a"),
+        ("*D_NET *1 3", "*D_NET *1 9"),
+        ("*NAME_MAP", "*D_NET *1 3\n*END\n*NAME_MAP"),
+        ("2 *2:A 2", "2 *2:A 2\n3 *2:A remote:1 1"),
+    ] {
+        texts.push(source().replace(from, to));
+    }
+    let limits = [
+        Limits::default(),
+        Limits {
+            max_nets: 1,
+            ..Limits::default()
+        },
+        Limits {
+            max_nodes: 2,
+            ..Limits::default()
+        },
+        Limits {
+            max_elements: 3,
+            ..Limits::default()
+        },
+        Limits {
+            max_name_bytes: 8,
+            ..Limits::default()
+        },
+    ];
+    let mut both = 0;
+    for text in &texts {
+        for limits in limits {
+            let full = read(text, limits).map(|s| Counts {
+                nets: s.nets.len(),
+                node_count: s.node_count,
+                element_count: s.element_count,
+                coupling_records: s.coupling_records,
+            });
+            both += usize::from(full.is_ok());
+            assert_eq!(count(text, limits), full, "{text}");
+        }
+    }
+    assert!(both >= 3, "{both}");
+}

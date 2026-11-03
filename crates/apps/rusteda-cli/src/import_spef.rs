@@ -210,7 +210,7 @@ pub(crate) fn import_spefs(
 
     let mut per_corner = serde_json::Map::new();
     let mut coupling_records = 0usize;
-    // The decoded sources parsed so far in this import and their counts: the parse is a pure
+    // The decoded sources checked so far in this import and their counts: the parse is a pure
     // function of the decoded text and `limits`, which all inputs share, so an input whose
     // decoded text equals an earlier one reuses its counts and its text.
     let mut parsed_sources: Vec<(Rc<Vec<u8>>, Parsed)> = Vec::new();
@@ -236,14 +236,14 @@ pub(crate) fn import_spefs(
         let (text, parsed) = match earlier {
             Some((text, parsed)) => (Rc::clone(text), *parsed),
             None => {
-                let spef = spef::read(&decoded.text, limits).map_err(&mut reject)?;
+                // The checks of `spef::read`, holding one net at a time.
+                let counts = spef::count(&decoded.text, limits).map_err(&mut reject)?;
                 let parsed = Parsed {
-                    nets: spef.nets.len(),
-                    nodes: spef.node_count,
-                    elements: spef.element_count,
-                    coupling_records: spef.coupling_records,
+                    nets: counts.nets,
+                    nodes: counts.node_count,
+                    elements: counts.element_count,
+                    coupling_records: counts.coupling_records,
                 };
-                drop(spef);
                 let text = Rc::new(decoded.text.into_bytes());
                 parsed_sources.push((Rc::clone(&text), parsed));
                 (text, parsed)

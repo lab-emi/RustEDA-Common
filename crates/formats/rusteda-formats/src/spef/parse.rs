@@ -32,10 +32,40 @@ struct Parser {
     res_scale: Option<f64>,
     header: BTreeSet<String>,
     spef: Spef,
+    /// The detailed nets read so far, and whether each is kept in `spef.nets` once checked.
+    nets: usize,
+    keep_nets: bool,
+}
+
+/// The counts of a SPEF source that [`count`] reads.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Counts {
+    pub nets: usize,
+    pub node_count: usize,
+    pub element_count: usize,
+    pub coupling_records: usize,
 }
 
 /// Parse within explicit allocation/work budgets. No graph traversal or recursion.
 pub fn read(text: &str, limits: Limits) -> Result<Spef, Error> {
+    Ok(parse(text, limits, true)?.0)
+}
+
+/// The counts [`read`] reports for `text`: the same parse and checks, each net dropped once it
+/// is checked instead of kept, so that only one net is held at a time. Fails exactly when
+/// [`read`] fails, with the same error.
+pub fn count(text: &str, limits: Limits) -> Result<Counts, Error> {
+    let (spef, nets) = parse(text, limits, false)?;
+    Ok(Counts {
+        nets,
+        node_count: spef.node_count,
+        element_count: spef.element_count,
+        coupling_records: spef.coupling_records,
+    })
+}
+
+/// The parse of `text` (without its nets unless `keep_nets`) and its number of nets.
+fn parse(text: &str, limits: Limits, keep_nets: bool) -> Result<(Spef, usize), Error> {
     limits.validate()?;
     if text.len() > limits.max_bytes {
         return Err(Error::new(0, "T0072", "SPEF source byte budget exceeded"));
@@ -67,6 +97,8 @@ pub fn read(text: &str, limits: Limits) -> Result<Spef, Error> {
             node_count: 0,
             element_count: 0,
         },
+        nets: 0,
+        keep_nets,
     };
     for (i, raw) in text.lines().enumerate() {
         p.line = i + 1;
@@ -81,7 +113,7 @@ pub fn read(text: &str, limits: Limits) -> Result<Spef, Error> {
     if p.current.is_some() {
         return Err(p.err("missing *END"));
     }
-    if p.spef.nets.is_empty() {
+    if p.nets == 0 {
         return Err(p.err("no detailed RC nets"));
     }
     for h in [
@@ -99,7 +131,7 @@ pub fn read(text: &str, limits: Limits) -> Result<Spef, Error> {
         }
     }
     p.spef.nets.sort_by(|a, b| a.name.cmp(&b.name));
-    Ok(p.spef)
+    Ok((p.spef, p.nets))
 }
 
 // Keep escapes while tokenizing: an escaped divider is a literal name character.
@@ -215,7 +247,7 @@ impl Parser {
             if self.current.is_some() || t.len() != 3 {
                 return Err(self.err("invalid *D_NET nesting/arity"));
             }
-            if self.spef.nets.len() == self.limits.max_nets {
+            if self.nets == self.limits.max_nets {
                 return Err(self.budget("RC net budget exceeded"));
             }
             let scale = self
@@ -245,11 +277,11 @@ impl Parser {
         if ["*CONN", "*CAP", "*RES", "*END"].contains(&key) {
             return Err(self.err("net section outside *D_NET"));
         }
-        if key == "*NAME_MAP" && t.len() == 1 && self.spef.nets.is_empty() {
+        if key == "*NAME_MAP" && t.len() == 1 && self.nets == 0 {
             self.section = Section::Names;
             return Ok(());
         }
-        if key == "*PORTS" && t.len() == 1 && self.spef.nets.is_empty() {
+        if key == "*PORTS" && t.len() == 1 && self.nets == 0 {
             self.section = Section::Ports;
             return Ok(());
         }
@@ -434,7 +466,10 @@ impl Parser {
                         net.name, net.total_cap_pf, sum
                     )));
                 }
-                self.spef.nets.push(net);
+                self.nets += 1;
+                if self.keep_nets {
+                    self.spef.nets.push(net);
+                }
                 self.node_names.clear();
                 self.conn_nodes.clear();
                 self.cap_ids.clear();
