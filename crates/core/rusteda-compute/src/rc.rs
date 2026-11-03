@@ -7,6 +7,7 @@
 use crate::ComputeError;
 
 pub mod charge;
+mod replay;
 
 /// Progress-normalized trip points: falling voltages are mapped through 1-v.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -165,25 +166,43 @@ impl Poles {
         };
         (root, far)
     }
+    /// The time at which the root response to a ramp of duration `d` reaches `p`: a bisection
+    /// of `[0, d - a ln(1 - p)]` (at most 80 halvings to a relative 1e-13), replayed with the
+    /// certified decisions of [`replay`] when its error model holds.
     fn crossing(self, d: f64, p: f64) -> f64 {
         // `self.root(x, d)` with the late-time factors of both poles computed once.
         let (ra, rb) = (Ramp::new(d, self.a), Ramp::new(d, self.b));
         let w = self.root_weight;
-        let mut lo = 0.0;
-        let mut hi = d - self.a * (1.0 - p).ln();
+        let f = |x: f64| w * ra.at(x) + (1.0 - w) * rb.at(x);
+        let hi = d - self.a * (1.0 - p).ln();
         let tolerance = (hi * 1e-13).max(1e-16);
-        for _ in 0..80 {
-            if hi - lo <= tolerance {
-                break;
-            }
-            let mid = lo + (hi - lo) * 0.5;
-            if w * ra.at(mid) + (1.0 - w) * rb.at(mid) < p {
-                lo = mid;
-            } else {
-                hi = mid;
-            }
+        if !(replay::modelled(d) && replay::monotone(self.a, self.b, w) && hi > 0.0 && hi <= 1e30) {
+            return replay::bisect(f, p, 0.0, hi, tolerance, 80);
         }
-        lo + (hi - lo) * 0.5
+        // The same evaluation as `f`, with its slope.
+        let fs = |x: f64| {
+            let ((va, sa), (vb, sb)) = (ra.at_slope(x), rb.at_slope(x));
+            (w * va + (1.0 - w) * vb, w * sa + (1.0 - w) * sb)
+        };
+        let mut certificate = replay::Certificate::new(p, replay::root_error(w));
+        // Start from the slow pole alone after the ramp: 1 + w k_a e^(-(x-d)/a) = p.
+        let k = w * ra.late();
+        let late = d + self.a * (-k / (1.0 - p)).ln();
+        let guess = if k < 0.0 && late > d {
+            late
+        } else {
+            p * d + w * self.a + (1.0 - w) * self.b
+        };
+        certificate.probe(fs, 0.0, hi, guess, tolerance);
+        let x = certificate.bisect(f, 0.0, hi, tolerance, 80);
+        if replay::verify() {
+            replay::check(
+                x,
+                replay::bisect(f, p, 0.0, hi, tolerance, 80),
+                "a root crossing",
+            );
+        }
+        x
     }
 }
 
@@ -697,6 +716,54 @@ fn monotone_crossing(f: impl Fn(f64) -> f64, p: f64, start: f64) -> Result<f64, 
     Ok(lo + (hi - lo) * 0.5)
 }
 
+/// [`monotone_crossing`] of a nondecreasing response whose evaluation `f` is within `error` of
+/// it (see [`replay`]); `fs` is the same evaluation with its slope, and `guess` a start for the
+/// probes. The bisection is replayed with its certified decisions, so the result is
+/// [`monotone_crossing`]'s bit for bit.
+fn certified_crossing(
+    f: impl Fn(f64) -> f64,
+    fs: impl Fn(f64) -> (f64, f64),
+    p: f64,
+    start: f64,
+    error: f64,
+    guess: f64,
+) -> Result<f64, ComputeError> {
+    let mut certificate = replay::Certificate::new(p, error);
+    let mut hi = start.max(1e-15);
+    let mut doublings = 0;
+    loop {
+        let v = f(hi);
+        // Doubling stays within the model only up to 1e30; beyond, nothing is replayed.
+        if hi <= 1e30 {
+            certificate.record(hi, v);
+        }
+        if !(v < p) {
+            break;
+        }
+        hi *= 2.0;
+        doublings += 1;
+        if doublings > 64 || !hi.is_finite() {
+            return Err(ComputeError::Invalid(
+                "RC load crossing not bracketed".into(),
+            ));
+        }
+    }
+    let tolerance = (hi * 1e-13).max(1e-16);
+    if hi > 1e30 {
+        return Ok(replay::bisect(f, p, 0.0, hi, tolerance, 100));
+    }
+    certificate.probe(fs, 0.0, hi, guess, tolerance);
+    let x = certificate.bisect(&f, 0.0, hi, tolerance, 100);
+    if replay::verify() {
+        replay::check(
+            x,
+            replay::bisect(&f, p, 0.0, hi, tolerance, 100),
+            "a sink crossing",
+        );
+    }
+    Ok(x)
+}
+
 /// Per-sink threshold delay and transition when a finite-ramp Thevenin driver of resistance
 /// `res` (kOhm) and source ramp `duration` (ns) drives the pi `pi`: the sink voltage is the pi
 /// root response through a single pole of the sink's first moment `tau`. The delay runs from the
@@ -772,10 +839,29 @@ fn wire_from_driver_impl(
     };
     let start = duration + poles.a + poles.b + tau;
     let root_out = root_out.unwrap_or_else(|| poles.crossing(duration, t.output));
-    let sink_in = monotone_crossing(load, t.input, start)?;
-    let slew = (monotone_crossing(load, t.upper, start)?
-        - monotone_crossing(load, t.lower, start)?)
-        / t.derate;
+    let (sink_in, upper, lower) =
+        if da && db && replay::modelled(tau) && replay::monotone(poles.a, poles.b, w) {
+            // The same evaluation as `load`, with its slope.
+            let fs = |x: f64| {
+                let ((va, sa), (vb, sb), (vt, st)) =
+                    (ra.at_slope(x), rb.at_slope(x), rt.at_slope(x));
+                let ca = (poles.a * va - tau * vt) / (poles.a - tau);
+                let cb = (poles.b * vb - tau * vt) / (poles.b - tau);
+                let slope = w * ((poles.a * sa - tau * st) / (poles.a - tau))
+                    + (1.0 - w) * ((poles.b * sb - tau * st) / (poles.b - tau));
+                (w * ca + (1.0 - w) * cb, slope)
+            };
+            let error = replay::load_error(poles.a, poles.b, w, tau);
+            let sink_in = certified_crossing(load, fs, t.input, start, error, root_out + tau)?;
+            let upper = certified_crossing(load, fs, t.upper, start, error, sink_in)?;
+            let lower = certified_crossing(load, fs, t.lower, start, error, sink_in)?;
+            (sink_in, upper, lower)
+        } else {
+            let sink_in = monotone_crossing(load, t.input, start)?;
+            let upper = monotone_crossing(load, t.upper, start)?;
+            (sink_in, upper, monotone_crossing(load, t.lower, start)?)
+        };
+    let slew = (upper - lower) / t.derate;
     let delay = sink_in - root_out;
     if !delay.is_finite() || !slew.is_finite() {
         return Err(ComputeError::Invalid("RC threshold solve overflow".into()));
@@ -1144,6 +1230,89 @@ mod tests {
                 }
             }
         }
+    }
+    // STA-REQ-0729: the certified replays of the root and sink bisections return the plain
+    // bisections' crossings bit for bit over random pi loads, drivers, durations, sink poles and
+    // trip points, including root weights above 1.
+    #[test]
+    fn replayed_crossings_equal_their_bisections() {
+        let mut state = 0x853c_49e6_748f_ea9bu64;
+        let mut next = || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            (state >> 11) as f64 / (1u64 << 53) as f64
+        };
+        let mut replayed = 0;
+        for case in 0..4000 {
+            let log = |u: f64, lo: f64, hi: f64| 10f64.powf(lo + (hi - lo) * u);
+            let pi = Pi {
+                near: log(next(), -5.0, -1.0),
+                far: log(next(), -5.0, -1.0),
+                resistance: log(next(), -3.0, 1.0),
+            };
+            let res = log(next(), -2.0, 1.5);
+            let duration = if case % 17 == 0 {
+                0.0
+            } else {
+                log(next(), -4.0, 0.0)
+            };
+            let tau = match case % 5 {
+                0 => 0.0,
+                _ => log(next(), -5.0, 0.0),
+            };
+            let lower = 0.1 + 0.3 * next();
+            let upper = 0.6 + 0.35 * next();
+            let t = Thresholds {
+                lower,
+                upper,
+                input: lower + (upper - lower) * next(),
+                output: lower + (upper - lower) * next(),
+                derate: 0.5 + 0.5 * next(),
+            };
+            let poles = Poles::new(pi, res);
+            let w = poles.root_weight;
+            replayed += usize::from(replay::monotone(poles.a, poles.b, w));
+            let (ra, rb) = (Ramp::new(duration, poles.a), Ramp::new(duration, poles.b));
+            for p in [t.lower, t.output, t.upper] {
+                let hi = duration - poles.a * (1.0 - p).ln();
+                let plain = replay::bisect(
+                    |x| w * ra.at(x) + (1.0 - w) * rb.at(x),
+                    p,
+                    0.0,
+                    hi,
+                    (hi * 1e-13).max(1e-16),
+                    80,
+                );
+                assert_eq!(
+                    poles.crossing(duration, p).to_bits(),
+                    plain.to_bits(),
+                    "{case}"
+                );
+            }
+            let load = |x: f64| {
+                w * cascade(x, duration, poles.a, tau)
+                    + (1.0 - w) * cascade(x, duration, poles.b, tau)
+            };
+            let start = duration + poles.a + poles.b + tau;
+            let old = (|| {
+                let sink_in = monotone_crossing(load, t.input, start)?;
+                let slew = (monotone_crossing(load, t.upper, start)?
+                    - monotone_crossing(load, t.lower, start)?)
+                    / t.derate;
+                Ok::<_, ComputeError>((sink_in, slew.max(0.0)))
+            })();
+            let new = wire_from_driver(pi, res, duration, tau, t);
+            match (old, new) {
+                (Ok((sink_in, slew)), Ok((delay, s))) => {
+                    let root = poles.crossing(duration, t.output);
+                    assert_eq!((sink_in - root).to_bits(), delay.to_bits(), "{case}");
+                    assert_eq!(slew.to_bits(), s.to_bits(), "{case}");
+                }
+                (old, new) => assert_eq!(old.is_err(), new.is_err(), "{case}"),
+            }
+        }
+        assert!(replayed > 1000, "{replayed}");
     }
     // STA-REQ-0722: normalized polarity/derate, unchanged zero RC, stable small arguments.
     #[test]
