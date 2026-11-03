@@ -154,7 +154,21 @@ impl Poles {
         (self.a * ramp_voltage(x, d, self.a) - self.b * ramp_voltage(x, d, self.b))
             / (self.a - self.b)
     }
+    /// `(self.root(x, d), self.far(x, d))` with each pole's ramp evaluated once.
+    fn root_and_far(self, x: f64, d: f64) -> (f64, f64) {
+        let (va, vb) = (ramp_voltage(x, d, self.a), ramp_voltage(x, d, self.b));
+        let root = self.root_weight * va + (1.0 - self.root_weight) * vb;
+        let far = if self.a == self.b {
+            root
+        } else {
+            (self.a * va - self.b * vb) / (self.a - self.b)
+        };
+        (root, far)
+    }
     fn crossing(self, d: f64, p: f64) -> f64 {
+        // `self.root(x, d)` with the late-time factors of both poles computed once.
+        let (ra, rb) = (Ramp::new(d, self.a), Ramp::new(d, self.b));
+        let w = self.root_weight;
         let mut lo = 0.0;
         let mut hi = d - self.a * (1.0 - p).ln();
         let tolerance = (hi * 1e-13).max(1e-16);
@@ -163,13 +177,62 @@ impl Poles {
                 break;
             }
             let mid = lo + (hi - lo) * 0.5;
-            if self.root(mid, d) < p {
+            if w * ra.at(mid) + (1.0 - w) * rb.at(mid) < p {
                 lo = mid;
             } else {
                 hi = mid;
             }
         }
         lo + (hi - lo) * 0.5
+    }
+}
+
+/// [`ramp_voltage`] of one duration and pole time with its late-time factor
+/// `tau / duration * expm1(-duration / tau)` computed once. [`Ramp::at`] evaluates the same
+/// operations in the same order as [`ramp_voltage`], so every value is bit-identical to it.
+#[derive(Debug, Clone, Copy)]
+struct Ramp {
+    duration: f64,
+    tau: f64,
+    late: f64,
+}
+
+impl Ramp {
+    fn new(duration: f64, tau: f64) -> Self {
+        let late = if tau != 0.0 && duration != 0.0 {
+            tau / duration * (-duration / tau).exp_m1()
+        } else {
+            0.0
+        };
+        Self {
+            duration,
+            tau,
+            late,
+        }
+    }
+
+    /// `ramp_voltage(time, self.duration, self.tau)`.
+    #[inline]
+    fn at(self, time: f64) -> f64 {
+        let (duration, tau) = (self.duration, self.tau);
+        if time <= 0.0 {
+            return 0.0;
+        }
+        if tau == 0.0 {
+            return if duration == 0.0 {
+                1.0
+            } else {
+                (time / duration).min(1.0)
+            };
+        }
+        if duration == 0.0 {
+            return -(-time / tau).exp_m1();
+        }
+        if time <= duration {
+            time / duration * charged_fraction(time, tau)
+        } else {
+            1.0 + self.late * (-(time - duration) / tau).exp()
+        }
     }
 }
 
@@ -645,6 +708,32 @@ pub fn wire_from_driver(
     tau: f64,
     t: Thresholds,
 ) -> Result<(f64, f64), ComputeError> {
+    wire_from_driver_impl(pi, res, duration, None, tau, t)
+}
+
+/// [`wire_from_driver`] with the root's output trip-point crossing `root_out` (ns) given by the
+/// caller: the `root_crossing` of the [`GateResponse`] whose resistance `res` and duration
+/// `duration` drive the same `pi` with the same `t.output`. That crossing is the one
+/// [`wire_from_driver`] computes, so both return bit-identical values.
+pub fn wire_from_driver_root(
+    pi: Pi,
+    res: f64,
+    duration: f64,
+    root_out: f64,
+    tau: f64,
+    t: Thresholds,
+) -> Result<(f64, f64), ComputeError> {
+    wire_from_driver_impl(pi, res, duration, Some(root_out), tau, t)
+}
+
+fn wire_from_driver_impl(
+    pi: Pi,
+    res: f64,
+    duration: f64,
+    root_out: Option<f64>,
+    tau: f64,
+    t: Thresholds,
+) -> Result<(f64, f64), ComputeError> {
     pi.validate()?;
     t.validate()?;
     if !res.is_finite() || res <= 0.0 || pi.resistance <= 0.0 || pi.far <= 0.0 {
@@ -657,11 +746,32 @@ pub fn wire_from_driver(
     }
     let poles = Poles::new(pi, res);
     let w = poles.root_weight;
+    // `w * cascade(x, duration, a, tau) + (1 - w) * cascade(x, duration, b, tau)`: a cascade of
+    // distinct poles is evaluated with the same operations as `cascade`, sharing the sink pole's
+    // ramp between both terms and the late-time factors of the three ramps.
+    let (ra, rb, rt) = (
+        Ramp::new(duration, poles.a),
+        Ramp::new(duration, poles.b),
+        Ramp::new(duration, tau),
+    );
+    let distinct = |p: f64| (p - tau).abs() > 1e-6 * p.max(tau);
+    let (da, db) = (distinct(poles.a), distinct(poles.b));
     let load = |x: f64| {
-        w * cascade(x, duration, poles.a, tau) + (1.0 - w) * cascade(x, duration, poles.b, tau)
+        let vt = if da || db { rt.at(x) } else { 0.0 };
+        let ca = if da {
+            (poles.a * ra.at(x) - tau * vt) / (poles.a - tau)
+        } else {
+            cascade(x, duration, poles.a, tau)
+        };
+        let cb = if db {
+            (poles.b * rb.at(x) - tau * vt) / (poles.b - tau)
+        } else {
+            cascade(x, duration, poles.b, tau)
+        };
+        w * ca + (1.0 - w) * cb
     };
     let start = duration + poles.a + poles.b + tau;
-    let root_out = poles.crossing(duration, t.output);
+    let root_out = root_out.unwrap_or_else(|| poles.crossing(duration, t.output));
     let sink_in = monotone_crossing(load, t.input, start)?;
     let slew = (monotone_crossing(load, t.upper, start)?
         - monotone_crossing(load, t.lower, start)?)
@@ -920,6 +1030,120 @@ mod tests {
             .is_err()
         );
         assert!(wire_from_driver(pi, res, -1.0, tau, t).is_err());
+    }
+    /// A deterministic sweep of positive values spanning many decades, with exact zeros.
+    fn sweep(seed: u64, n: usize) -> Vec<f64> {
+        let mut x = seed;
+        let mut out = vec![0.0];
+        for _ in 0..n {
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            let mantissa = (x >> 11) as f64 / (1u64 << 53) as f64;
+            let exponent = (x % 13) as i32 - 9;
+            out.push((1.0 + mantissa) * 10f64.powi(exponent));
+        }
+        out
+    }
+    // STA-REQ-0729: the hoisted late-time factor, the shared sink ramp and the root crossing
+    // given by the caller change no bit of any ramp, crossing or wire value.
+    #[test]
+    fn hoisted_ramps_and_given_root_crossing_are_bit_identical() {
+        let values = sweep(0x9e37_79b9_7f4a_7c15, 60);
+        for &d in &values {
+            for &tau in &values {
+                let ramp = Ramp::new(d, tau);
+                for &x in values.iter().chain(&[d, d * 0.5, d * 2.0, -1.0]) {
+                    assert_eq!(
+                        ramp.at(x).to_bits(),
+                        ramp_voltage(x, d, tau).to_bits(),
+                        "{x} {d} {tau}"
+                    );
+                }
+            }
+        }
+        // The reference bisection of `Poles::crossing` with `Poles::root`.
+        let reference = |poles: Poles, d: f64, p: f64| {
+            let mut lo = 0.0;
+            let mut hi = d - poles.a * (1.0 - p).ln();
+            let tolerance = (hi * 1e-13).max(1e-16);
+            for _ in 0..80 {
+                if hi - lo <= tolerance {
+                    break;
+                }
+                let mid = lo + (hi - lo) * 0.5;
+                if poles.root(mid, d) < p {
+                    lo = mid;
+                } else {
+                    hi = mid;
+                }
+            }
+            lo + (hi - lo) * 0.5
+        };
+        let t = trips();
+        let scales = sweep(0x2545_f491_4f6c_dd1d, 12);
+        for (i, &near) in scales.iter().enumerate() {
+            for (j, &far) in scales.iter().enumerate().skip(1) {
+                let pi = Pi {
+                    near: near * 1e-3,
+                    far: far * 1e-3,
+                    resistance: scales[(i + j) % scales.len()].max(1e-6),
+                };
+                let res = scales[(2 * i + j + 1) % scales.len()].max(1e-6);
+                let poles = Poles::new(pi, res);
+                for &d in &[0.0, 1e-3, 0.05, 0.4] {
+                    for p in [t.lower, t.output, t.upper, 0.37] {
+                        assert_eq!(
+                            poles.crossing(d, p).to_bits(),
+                            reference(poles, d, p).to_bits()
+                        );
+                    }
+                    let (root, far) = poles.root_and_far(d, d);
+                    assert_eq!(root.to_bits(), poles.root(d, d).to_bits());
+                    assert_eq!(far.to_bits(), poles.far(d, d).to_bits());
+                    for &tau in &[0.0, poles.a, poles.b, poles.a * (1.0 + 1e-9), 1e-3, 0.2] {
+                        // The sink crossings of the reference load `w * cascade + (1 - w) *
+                        // cascade`.
+                        let w = poles.root_weight;
+                        let load = |x: f64| {
+                            w * cascade(x, d, poles.a, tau)
+                                + (1.0 - w) * cascade(x, d, poles.b, tau)
+                        };
+                        let start = d + poles.a + poles.b + tau;
+                        let old = (|| {
+                            let sink_in = monotone_crossing(load, t.input, start)?;
+                            let slew = (monotone_crossing(load, t.upper, start)?
+                                - monotone_crossing(load, t.lower, start)?)
+                                / t.derate;
+                            Ok::<_, ComputeError>((
+                                sink_in - reference(poles, d, t.output),
+                                slew.max(0.0),
+                            ))
+                        })();
+                        let full = wire_from_driver(pi, res, d, tau, t);
+                        if pi.resistance > 0.0
+                            && let (Ok(a), Ok(b)) = (&old, &full)
+                        {
+                            assert_eq!(
+                                (a.0.to_bits(), a.1.to_bits()),
+                                (b.0.to_bits(), b.1.to_bits())
+                            );
+                        }
+                        let given =
+                            wire_from_driver_root(pi, res, d, poles.crossing(d, t.output), tau, t);
+                        match (full, given) {
+                            (Ok(a), Ok(b)) => {
+                                assert_eq!(
+                                    (a.0.to_bits(), a.1.to_bits()),
+                                    (b.0.to_bits(), b.1.to_bits())
+                                );
+                            }
+                            (a, b) => assert_eq!(a.is_err(), b.is_err()),
+                        }
+                    }
+                }
+            }
+        }
     }
     // STA-REQ-0722: normalized polarity/derate, unchanged zero RC, stable small arguments.
     #[test]
