@@ -141,7 +141,7 @@ struct Imported {
 /// Where the compiled form of an [`Imported`] library comes from.
 enum Origin {
     /// This invocation parsed the library.
-    Parsed(Library),
+    Parsed(Box<Library>),
     /// A shared cache holds it (RCLI-REQ-0025).
     Shared(SharedLibrary),
 }
@@ -285,7 +285,7 @@ pub(crate) fn import_libs(
                     name: lib.name.clone(),
                     cells: lib.cells.iter().map(|c| c.name.clone()).collect(),
                     diagnostics: converted,
-                    origin: Origin::Parsed(lib),
+                    origin: Origin::Parsed(Box::new(lib)),
                     bytes,
                 }
             }
