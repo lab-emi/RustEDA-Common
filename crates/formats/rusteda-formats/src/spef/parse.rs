@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 RustEDA contributors
 
-use super::{Connection, Error, Limits, Net, Node, Resistor, Spef};
-use std::collections::{BTreeMap, BTreeSet};
+use super::{Connection, Error, Limits, Net, Nodes, Resistor, Spef};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 #[derive(Clone, Copy, PartialEq)]
 enum Section {
@@ -19,7 +19,7 @@ struct Parser {
     limits: Limits,
     line: usize,
     name_bytes: usize,
-    names: BTreeMap<String, String>,
+    names: NameMap,
     net_names: BTreeSet<String>,
     node_names: BTreeMap<String, u32>,
     conn_nodes: BTreeSet<u32>,
@@ -74,7 +74,7 @@ fn parse(text: &str, limits: Limits, keep_nets: bool) -> Result<(Spef, usize), E
         limits,
         line: 0,
         name_bytes: 0,
-        names: BTreeMap::new(),
+        names: NameMap::default(),
         net_names: BTreeSet::new(),
         node_names: BTreeMap::new(),
         conn_nodes: BTreeSet::new(),
@@ -210,7 +210,10 @@ impl Parser {
                 .names
                 .get(key)
                 .ok_or_else(|| self.err(format!("unresolved name {key}")))?;
-            format!("{base}{}", &raw[n..])
+            let mut s = String::with_capacity(base.len() + raw.len() - n);
+            s.push_str(base);
+            s.push_str(&raw[n..]);
+            s
         } else {
             raw.to_owned()
         };
@@ -229,8 +232,8 @@ impl Parser {
         }
         let net = self.current.as_mut().expect("in net");
         let id = net.nodes.len() as u32;
-        self.node_names.insert(name.clone(), id);
-        net.nodes.push(Node { name, cap_pf: 0.0 });
+        net.nodes.push(&name, 0.0);
+        self.node_names.insert(name, id);
         self.spef.node_count += 1;
         Ok(id)
     }
@@ -264,7 +267,7 @@ impl Parser {
             self.current = Some(Net {
                 name,
                 total_cap_pf: cap,
-                nodes: Vec::new(),
+                nodes: Nodes::new(),
                 connections: Vec::new(),
                 resistors: Vec::new(),
             });
@@ -296,7 +299,7 @@ impl Parser {
                 return Err(self.budget("name map entry budget exceeded"));
             }
             let name = self.name(&t[1])?;
-            if self.names.insert(key.into(), name).is_some() {
+            if !self.names.insert(key, &name) {
                 return Err(self.err("duplicate name map id"));
             }
             return Ok(());
@@ -437,14 +440,21 @@ impl Parser {
                 // Canonical reductions and node/edge order, independent of statement order.
                 self.cap_terms
                     .sort_unstable_by(|a, b| a.0.cmp(&b.0).then(a.1.total_cmp(&b.1)));
+                let caps = net.nodes.caps_mut();
                 for &(node, cap) in &self.cap_terms {
-                    net.nodes[node as usize].cap_pf += cap;
+                    caps[node as usize] += cap;
                 }
+                // The nodes in name order (names are unique within a net), and the new index of
+                // every node.
+                let mut order: Vec<u32> = (0..net.nodes.len() as u32).collect();
+                order.sort_by(|&a, &b| net.nodes.name(a as usize).cmp(net.nodes.name(b as usize)));
                 let mut remap = vec![0u32; net.nodes.len()];
-                net.nodes.sort_by(|a, b| a.name.cmp(&b.name));
-                for (i, node) in net.nodes.iter().enumerate() {
-                    remap[self.node_names[&node.name] as usize] = i as u32;
+                let mut sorted = Nodes::with_capacity(net.nodes.len(), net.nodes.name_bytes());
+                for (i, &old) in order.iter().enumerate() {
+                    remap[old as usize] = i as u32;
+                    sorted.push(net.nodes.name(old as usize), net.nodes.cap_pf(old as usize));
                 }
+                net.nodes = sorted;
                 for c in &mut net.connections {
                     c.node = remap[c.node as usize];
                 }
@@ -457,7 +467,7 @@ impl Parser {
                 }
                 net.resistors
                     .sort_by(|a, b| (a.a, a.b).cmp(&(b.a, b.b)).then(a.kohm.total_cmp(&b.kohm)));
-                let sum: f64 = net.nodes.iter().map(|n| n.cap_pf).sum();
+                let sum: f64 = net.nodes.caps().iter().sum();
                 if !sum.is_finite()
                     || (sum - net.total_cap_pf).abs() > 1e-8_f64.max(net.total_cap_pf * 1e-4)
                 {
@@ -556,5 +566,70 @@ impl Parser {
                 .push(Resistor { a, b, kohm });
         }
         Ok(())
+    }
+}
+
+/// The `*NAME_MAP` of a source: the name of every index key (`*` and its digits). A key whose
+/// digits are canonical (no leading zero, at most 19 digits) is held by its number, the others
+/// by their text, so that one key is always held the same way and two keys are the same entry
+/// exactly when their texts are equal. The names are kept in one buffer, so that a map of a
+/// hundred thousand names is a few large blocks rather than two allocations per entry.
+#[derive(Default)]
+struct NameMap {
+    names: String,
+    /// `(start, end)` of the name of every entry in `names`.
+    spans: Vec<(u32, u32)>,
+    by_number: HashMap<u64, u32>,
+    by_text: BTreeMap<String, u32>,
+}
+
+impl NameMap {
+    fn number(key: &str) -> Option<u64> {
+        let digits = &key[1..];
+        if digits.is_empty() || digits.len() > 19 || (digits.len() > 1 && digits.starts_with('0')) {
+            return None;
+        }
+        digits.parse().ok()
+    }
+
+    fn len(&self) -> usize {
+        self.spans.len()
+    }
+
+    /// Adds `name` for `key`; false when `key` already has a name.
+    fn insert(&mut self, key: &str, name: &str) -> bool {
+        let entry = self.spans.len() as u32;
+        let fresh = match Self::number(key) {
+            Some(n) => match self.by_number.entry(n) {
+                std::collections::hash_map::Entry::Occupied(_) => false,
+                std::collections::hash_map::Entry::Vacant(v) => {
+                    v.insert(entry);
+                    true
+                }
+            },
+            None => match self.by_text.entry(key.to_owned()) {
+                std::collections::btree_map::Entry::Occupied(_) => false,
+                std::collections::btree_map::Entry::Vacant(v) => {
+                    v.insert(entry);
+                    true
+                }
+            },
+        };
+        if fresh {
+            let start = self.names.len() as u32;
+            self.names.push_str(name);
+            self.spans.push((start, self.names.len() as u32));
+        }
+        fresh
+    }
+
+    /// The name of `key`.
+    fn get(&self, key: &str) -> Option<&str> {
+        let entry = match Self::number(key) {
+            Some(n) => self.by_number.get(&n),
+            None => self.by_text.get(key),
+        }?;
+        let (start, end) = self.spans[*entry as usize];
+        Some(&self.names[start as usize..end as usize])
     }
 }

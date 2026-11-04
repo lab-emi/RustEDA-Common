@@ -88,11 +88,119 @@ impl Error {
     }
 }
 
-/// A local RC node (per-net indices never escape their net).
-#[derive(Debug, Clone, PartialEq)]
-pub struct Node {
-    pub name: String,
+/// A local RC node (per-net indices never escape their net), as [`Nodes`] holds it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Node<'a> {
+    pub name: &'a str,
     pub cap_pf: f64,
+}
+
+/// The RC nodes of one net by local index: their names in one buffer and their capacitances
+/// (pF), so that a net holds three allocations however many nodes it has instead of one name
+/// per node: a parsed extraction of a million nodes is a few large blocks, which its consumer
+/// can release at once.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Nodes {
+    names: String,
+    /// The end of the name of node `i` in `names`; it starts at the end of node `i - 1`.
+    ends: Vec<u32>,
+    caps: Vec<f64>,
+}
+
+impl Nodes {
+    /// No nodes.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// No nodes, with room for `nodes` nodes whose names total `name_bytes` bytes.
+    #[must_use]
+    pub fn with_capacity(nodes: usize, name_bytes: usize) -> Self {
+        Self {
+            names: String::with_capacity(name_bytes),
+            ends: Vec::with_capacity(nodes),
+            caps: Vec::with_capacity(nodes),
+        }
+    }
+
+    /// The number of nodes.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.caps.len()
+    }
+
+    /// True without nodes.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.caps.is_empty()
+    }
+
+    /// Appends a node named `name` with capacitance `cap_pf`; its index is the previous
+    /// [`Self::len`].
+    ///
+    /// # Panics
+    /// When the names of the net would exceed `u32::MAX` bytes (the reader caps them far
+    /// below).
+    pub fn push(&mut self, name: &str, cap_pf: f64) {
+        self.names.push_str(name);
+        let end = u32::try_from(self.names.len()).expect("RC node names of one net exceed 4 GiB");
+        self.ends.push(end);
+        self.caps.push(cap_pf);
+    }
+
+    /// The name of node `i`.
+    ///
+    /// # Panics
+    /// When `i` is not below [`Self::len`], as indexing a slice does.
+    #[must_use]
+    pub fn name(&self, i: usize) -> &str {
+        let start = if i == 0 { 0 } else { self.ends[i - 1] as usize };
+        &self.names[start..self.ends[i] as usize]
+    }
+
+    /// The capacitance (pF) of node `i`.
+    ///
+    /// # Panics
+    /// When `i` is not below [`Self::len`].
+    #[must_use]
+    pub fn cap_pf(&self, i: usize) -> f64 {
+        self.caps[i]
+    }
+
+    /// The capacitances (pF) of the nodes, by index.
+    #[must_use]
+    pub fn caps(&self) -> &[f64] {
+        &self.caps
+    }
+
+    /// The capacitances (pF) of the nodes, by index, to change them.
+    pub fn caps_mut(&mut self) -> &mut [f64] {
+        &mut self.caps
+    }
+
+    /// Node `i`, if there is one.
+    #[must_use]
+    pub fn get(&self, i: usize) -> Option<Node<'_>> {
+        (i < self.len()).then(|| Node {
+            name: self.name(i),
+            cap_pf: self.caps[i],
+        })
+    }
+
+    /// The nodes in index order.
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = Node<'_>> + '_ {
+        (0..self.len()).map(|i| Node {
+            name: self.name(i),
+            cap_pf: self.caps[i],
+        })
+    }
+
+    /// The total bytes of the node names.
+    #[must_use]
+    pub fn name_bytes(&self) -> usize {
+        self.names.len()
+    }
 }
 
 /// A physical connection, with the source's declared direction.
@@ -116,7 +224,7 @@ pub struct Resistor {
 pub struct Net {
     pub name: String,
     pub total_cap_pf: f64,
-    pub nodes: Vec<Node>,
+    pub nodes: Nodes,
     pub connections: Vec<Connection>,
     pub resistors: Vec<Resistor>,
 }
@@ -173,10 +281,10 @@ impl Spef {
             bytes = bytes.saturating_add(net.name.len());
             let mut node_names = std::collections::BTreeSet::new();
             let mut sum = 0.0;
-            for node in &net.nodes {
+            for node in net.nodes.iter() {
                 if node.name.is_empty()
                     || node.name.len() > 4096
-                    || !node_names.insert(node.name.as_str())
+                    || !node_names.insert(node.name)
                     || !node.cap_pf.is_finite()
                     || node.cap_pf < 0.0
                 {
