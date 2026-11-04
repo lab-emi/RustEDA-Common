@@ -30,8 +30,8 @@
 //! ([`CompiledDigest`]). A workspace adopts a library by writing its own copies of the two files
 //! ([`LibraryCache::put_shared`]): the `.lib` from the bytes the caller read, the `.rlib` from
 //! the shared bytes once they are exactly the recorded ones. No file of a workspace cache is
-//! ever a link of a shared file or of another workspace's file, so a workspace keeps the
-//! guarantee of WS-REQ-0037 whatever happens to the shared directory.
+//! ever a link of a shared file, so a workspace keeps the guarantee of WS-REQ-0037 whatever
+//! happens to the shared directory.
 
 use std::fs;
 use std::ops::RangeInclusive;
