@@ -15,8 +15,11 @@
 //! value. The same parse gives the ordered value tree behind the `Serialize` implementations of
 //! [`crate::RawJson`] and [`crate::JsonObject`].
 
-use std::collections::BTreeSet;
+use std::borrow::Cow;
+use std::collections::HashSet;
+use std::collections::hash_map::DefaultHasher;
 use std::fmt::Write as _;
+use std::hash::{Hash, Hasher};
 
 use serde::ser::{Error as _, SerializeMap, SerializeSeq};
 use serde::{Serialize, Serializer};
@@ -83,16 +86,29 @@ pub fn quote(text: &str) -> String {
 }
 
 /// A parsed JSON value that keeps the text of its scalars and the order of its keys.
+///
+/// The value of a string borrows the text when it has no escape, which is almost always the
+/// case, so a parse allocates only for containers.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Node<'a> {
     /// `null`, `true`, `false` or a number, as written.
     Literal(&'a str),
     /// A string: its text with quotes and escapes, and its value.
-    Str { raw: &'a str, value: String },
+    Str { raw: &'a str, value: Cow<'a, str> },
     /// An array.
     Array(Vec<Node<'a>>),
     /// An object: (key text with quotes, key value, value), in text order.
-    Object(Vec<(&'a str, String, Node<'a>)>),
+    Object(Vec<(&'a str, Cow<'a, str>, Node<'a>)>),
+}
+
+/// Objects with at most this many keys find a duplicate key by comparing it with each earlier
+/// key; larger ones look up the hash of the key first.
+const LINEAR_KEYS: usize = 16;
+
+fn key_hash(key: &str) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    key.hash(&mut hasher);
+    hasher.finish()
 }
 
 /// Parses one JSON value without duplicate keys.
@@ -289,11 +305,12 @@ impl<'a> Parser<'a> {
     }
 
     fn object(&mut self, depth: usize) -> Result<Node<'a>, JsonSyntaxError> {
-        let mut fields = Vec::new();
+        let mut fields: Vec<(&'a str, Cow<'a, str>, Node<'a>)> = Vec::new();
         if self.open(b'}') {
             return Ok(Node::Object(fields));
         }
-        let mut keys = BTreeSet::new();
+        // The hashes of the keys, once the object has more than `LINEAR_KEYS` of them.
+        let mut hashes: Option<HashSet<u64>> = None;
         loop {
             self.skip_ws();
             if self.peek() != Some(b'"') {
@@ -301,7 +318,23 @@ impl<'a> Parser<'a> {
             }
             let at = self.pos;
             let (raw, key) = self.string()?;
-            if !keys.insert(key.clone()) {
+            let duplicate = match &mut hashes {
+                None => {
+                    let duplicate = fields.iter().any(|(_, k, _)| *k == key);
+                    if !duplicate && fields.len() >= LINEAR_KEYS {
+                        let mut set: HashSet<u64> =
+                            fields.iter().map(|(_, k, _)| key_hash(k)).collect();
+                        set.insert(key_hash(&key));
+                        hashes = Some(set);
+                    }
+                    duplicate
+                }
+                // A new hash is a new key; an equal hash is compared with the keys.
+                Some(set) => {
+                    !set.insert(key_hash(&key)) && fields.iter().any(|(_, k, _)| *k == key)
+                }
+            };
+            if duplicate {
                 return Err(JsonSyntaxError {
                     offset: at,
                     reason: "duplicate key in an object",
@@ -320,11 +353,30 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// A string literal: its text with quotes, and its value.
-    fn string(&mut self) -> Result<(&'a str, String), JsonSyntaxError> {
+    /// A string literal: its text with quotes, and its value, borrowed from the text unless
+    /// the literal has an escape.
+    fn string(&mut self) -> Result<(&'a str, Cow<'a, str>), JsonSyntaxError> {
         let start = self.pos;
-        self.pos += 1;
-        let mut value = String::new();
+        let bytes = self.text.as_bytes();
+        // Up to the first quote, backslash or control character byte by byte: none of them
+        // is part of a multi-byte character, so the prefix ends at a character boundary.
+        let mut end = start + 1;
+        while let Some(&b) = bytes.get(end) {
+            match b {
+                b'"' => {
+                    self.pos = end + 1;
+                    return Ok((self.since(start), Cow::Borrowed(&self.text[start + 1..end])));
+                }
+                b'\\' => break,
+                b if b < 0x20 => {
+                    self.pos = end;
+                    return Err(self.error("control character in a string"));
+                }
+                _ => end += 1,
+            }
+        }
+        self.pos = end;
+        let mut value = self.text[start + 1..end].to_string();
         loop {
             let Some(c) = self.text[self.pos..].chars().next() else {
                 return Err(self.error("unterminated string"));
@@ -332,7 +384,7 @@ impl<'a> Parser<'a> {
             match c {
                 '"' => {
                     self.pos += 1;
-                    return Ok((self.since(start), value));
+                    return Ok((self.since(start), Cow::Owned(value)));
                 }
                 '\\' => {
                     self.pos += 1;
@@ -555,6 +607,52 @@ mod tests {
                 value: "😀".into()
             }
         );
+    }
+
+    // WS-REQ-0091: string values borrow the text unless they have an escape; duplicate keys
+    // are found in objects of any size, also when written with escapes, and the error points
+    // at the second key.
+    #[test]
+    fn borrows_plain_strings_and_finds_duplicates_in_large_objects() {
+        let Node::Array(items) = parse(r#"["plain é ✓","esc\u00e9\n",""]"#).unwrap() else {
+            panic!("array expected");
+        };
+        let values: Vec<(bool, String)> = items
+            .iter()
+            .map(|n| match n {
+                Node::Str { value, .. } => (matches!(value, Cow::Borrowed(_)), value.to_string()),
+                _ => panic!("string expected"),
+            })
+            .collect();
+        assert_eq!(
+            values,
+            [
+                (true, "plain é ✓".to_string()),
+                (false, "esc\u{e9}\n".to_string()),
+                (true, String::new())
+            ]
+        );
+        for n in [1usize, 15, 16, 17, 40] {
+            let keys: Vec<String> = (0..n).map(|i| format!("\"k{i}\":{i}")).collect();
+            let ok = format!("{{{}}}", keys.join(","));
+            validate(&ok).unwrap();
+            for dup in [r#""k0""#, r#""\u006b0""#] {
+                let bad = format!("{{{},{dup}:0}}", keys.join(","));
+                let err = validate(&bad).unwrap_err();
+                assert_eq!(err.reason, "duplicate key in an object", "{bad}");
+                assert_eq!(err.offset, ok.len(), "{bad}");
+            }
+            if n > 1 {
+                let last = format!("\"k{}\"", n - 1);
+                let bad = format!("{{{},{last}:0,\"z\":1}}", keys.join(","));
+                assert_eq!(validate(&bad).unwrap_err().offset, ok.len(), "{bad}");
+            }
+        }
+        // Errors inside a string keep their offsets on both paths.
+        assert_eq!(validate("\"ab\u{1}\"").unwrap_err().offset, 3);
+        assert_eq!(validate("\"a\\nb\u{1}\"").unwrap_err().offset, 5);
+        assert_eq!(validate("\"abc").unwrap_err().offset, 4);
+        assert_eq!(validate("\"a\\nbc").unwrap_err().offset, 6);
     }
 
     // WS-REQ-0091 (review CR2-9): the tree serializes through serde in text order, with the
