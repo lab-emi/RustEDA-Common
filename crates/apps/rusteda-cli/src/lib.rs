@@ -164,9 +164,10 @@ pub struct ImportArgs {
     #[arg(long = "lib", action = clap::ArgAction::Append, value_name = "FILE")]
     pub libs: Vec<PathBuf>,
     /// Compile cache shared with other workspaces (created when missing): a `--lib` that this
-    /// executable compiled there before, from the same bytes and path, is linked into the
-    /// workspace cache instead of parsed again, and a library compiled here is added to it.
-    /// The workspace gets the same files either way (RCLI-REQ-0025).
+    /// executable compiled there before, from the same bytes and path, is copied into the
+    /// workspace cache instead of parsed again, once its compiled form is exactly the recorded
+    /// one, and a library compiled here is added to it. The workspace gets the same files
+    /// either way, files of its own (RCLI-REQ-0025).
     #[arg(long = "lib-cache", value_name = "DIR")]
     pub lib_cache: Option<PathBuf>,
     /// Corner name for the preceding `--lib` (default `"default"`).

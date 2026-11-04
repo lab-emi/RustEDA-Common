@@ -13,19 +13,21 @@ use rusteda_core::diag as core_diag;
 use rusteda_formats::liberty::{self, Library};
 use rusteda_workspace::hash::hash_file;
 use rusteda_workspace::{
-    CachedLibrary, DiagCode, Diagnostic, Error, Hash64, JsonMap, Severity, SharedLibrary,
-    SharedLibraryCache, Txn, Workspace, rlib,
+    CachedLibrary, CompiledDigest, DiagCode, Diagnostic, Error, Hash64, JsonMap, Severity,
+    SharedLibrary, SharedLibraryCache, Txn, Workspace, rlib,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 /// The schema of the record that `rusteda import` keeps with a library in a shared cache.
-const RECORD_SCHEMA: &str = "rusteda.lib-cache-record.v1";
+const RECORD_SCHEMA: &str = "rusteda.lib-cache-record.v2";
 
 /// What `rusteda import` needs of a library besides its compiled form, kept with it in a
 /// shared cache so that a later import of the same bytes from the same source by the same
 /// executable does not parse it again (RCLI-REQ-0025): the library name, its cell names in
-/// order, and the reader's diagnostics (none of them an error), which name the source.
+/// order, the reader's diagnostics (none of them an error), which name the source, and the
+/// length and xxh3-64 of the compiled `.rlib` published with it, which an adopted `.rlib` must
+/// match byte for byte.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct CacheRecord {
@@ -37,6 +39,9 @@ struct CacheRecord {
     hash: String,
     bytes: u64,
     source: String,
+    /// The xxh3-64 of the compiled `.rlib`, in 16 hex digits.
+    rlib: String,
+    rlib_bytes: u64,
     cells: Vec<String>,
     diagnostics: Vec<Diagnostic>,
 }
@@ -73,16 +78,20 @@ impl LibCache {
     }
 
     /// The library of `bytes` (hash `hash`) imported from `source` that this executable
-    /// published, with its record.
+    /// published, with its record and the digest of the `.rlib` it published.
     fn lookup(
         &self,
         bytes: &[u8],
         hash: Hash64,
         source: &str,
-    ) -> Option<(SharedLibrary, CacheRecord)> {
+    ) -> Option<(SharedLibrary, CacheRecord, CompiledDigest)> {
         let found = self.shared.find(hash).ok()?;
         found.into_iter().find_map(|shared| {
             let record: CacheRecord = serde_json::from_slice(&shared.record).ok()?;
+            let compiled = CompiledDigest {
+                hash: Hash64::parse_hex(&record.rlib)?,
+                bytes: record.rlib_bytes,
+            };
             let accepted = record.schema == RECORD_SCHEMA
                 && record.executable == self.executable.hex()
                 && record.name == shared.name
@@ -93,16 +102,30 @@ impl LibCache {
                     .diagnostics
                     .iter()
                     .all(|d| d.severity != Severity::Error);
-            accepted.then_some((shared, record))
+            accepted.then_some((shared, record, compiled))
         })
     }
 
-    /// Publishes the library just stored in the workspace as `cached`. Publishing only saves
-    /// later imports work, so a failure is ignored: the import has its library either way.
-    fn publish(&self, cached: &CachedLibrary, record: &CacheRecord) {
-        if let Ok(text) = serde_json::to_vec(record) {
-            let _ = self.shared.publish(cached, &text);
-        }
+    /// Publishes the library just stored in the workspace as `cached`, imported as
+    /// `imported`. Publishing only saves later imports work, so a failure is ignored: the
+    /// import has its library either way.
+    fn publish(&self, cached: &CachedLibrary, imported: &Imported) {
+        let _ = self.shared.publish(cached, |compiled| {
+            let record = CacheRecord {
+                schema: RECORD_SCHEMA.to_string(),
+                executable: self.executable.hex(),
+                name: imported.name.clone(),
+                hash: imported.hash.hex(),
+                bytes: imported.bytes.len() as u64,
+                source: imported.source_str.clone(),
+                rlib: compiled.hash.hex(),
+                rlib_bytes: compiled.bytes,
+                cells: imported.cells.clone(),
+                diagnostics: imported.diagnostics.clone(),
+            };
+            // Serializing these fields cannot fail; an empty record would never be accepted.
+            serde_json::to_vec(&record).unwrap_or_default()
+        });
     }
 }
 
@@ -142,8 +165,8 @@ struct Imported {
 enum Origin {
     /// This invocation parsed the library.
     Parsed(Box<Library>),
-    /// A shared cache holds it (RCLI-REQ-0025).
-    Shared(SharedLibrary),
+    /// A shared cache holds it (RCLI-REQ-0025), compiled as the digest says.
+    Shared(SharedLibrary, CompiledDigest),
 }
 
 /// Reads `text` (from `source_str`) with the Liberty reader. On success, the library and the
@@ -210,7 +233,7 @@ fn parse_library(
 
 /// Validates and caches `--lib` inputs and adds them to `txn` (RCLI-REQ-0012, RCLI-REQ-0013).
 /// With `lib_cache`, a library that the shared cache holds for the same bytes, source and
-/// executable is linked into the workspace cache instead of parsed and compiled, and a library
+/// executable is copied into the workspace cache instead of parsed and compiled, and a library
 /// parsed here is published to it (RCLI-REQ-0025); the revision, the workspace cache files,
 /// the diagnostics and the metrics are the same either way.
 pub(crate) fn import_libs(
@@ -256,7 +279,7 @@ pub(crate) fn import_libs(
         let hash = Hash64::of(&bytes);
 
         let imported = match lib_cache.and_then(|c| c.lookup(&bytes, hash, &source_str)) {
-            Some((shared, record)) => {
+            Some((shared, record, compiled)) => {
                 diags.extend(record.diagnostics.iter().cloned());
                 Imported {
                     source_str,
@@ -265,7 +288,7 @@ pub(crate) fn import_libs(
                     name: record.name,
                     cells: record.cells,
                     diagnostics: record.diagnostics,
-                    origin: Origin::Shared(shared),
+                    origin: Origin::Shared(shared, compiled),
                     bytes,
                 }
             }
@@ -393,10 +416,10 @@ pub(crate) fn import_libs(
     Ok(())
 }
 
-/// Stores `imported` in the workspace cache: links it from the shared cache when it comes from
-/// there and its files verify, otherwise compiles it (parsing it again when it came from the
-/// shared cache, whose record must then agree with the reader), and publishes a library it
-/// compiled to the shared cache (RCLI-REQ-0025).
+/// Stores `imported` in the workspace cache: copies it from the shared cache when it comes from
+/// there and the shared `.rlib` is exactly the recorded one, otherwise compiles it (parsing it
+/// again when it came from the shared cache, whose record must then agree with the reader), and
+/// publishes a library it compiled to the shared cache (RCLI-REQ-0025).
 fn store(
     ws: &Workspace,
     lib_cache: Option<&LibCache>,
@@ -405,14 +428,18 @@ fn store(
     let reparsed;
     let lib = match &imported.origin {
         Origin::Parsed(lib) => lib,
-        Origin::Shared(shared) => {
-            if let Some(cached) =
-                ws.cache()
-                    .put_shared(shared, &imported.bytes, rlib::KIND, rlib::VERSIONS)?
-            {
+        Origin::Shared(shared, compiled) => {
+            if let Some(cached) = ws.cache().put_shared(
+                shared,
+                &imported.bytes,
+                *compiled,
+                rlib::KIND,
+                rlib::VERSIONS,
+            )? {
                 return Ok(cached);
             }
-            // The shared files did not verify (replaced or damaged since they were found).
+            // The shared .rlib is not the recorded one (replaced, damaged or of another
+            // publisher since the record was written).
             let text = std::str::from_utf8(&imported.bytes)
                 .map_err(|e| Error::internal(format!("cached library text: {e}")))?;
             let agrees = match parse_library(text, &imported.source_str) {
@@ -441,19 +468,7 @@ fn store(
     let cached = rlib::put(ws, lib, &imported.bytes)?;
     if let Some(cache) = lib_cache {
         debug_assert_eq!(cached.hash, imported.hash);
-        cache.publish(
-            &cached,
-            &CacheRecord {
-                schema: RECORD_SCHEMA.to_string(),
-                executable: cache.executable.hex(),
-                name: imported.name.clone(),
-                hash: imported.hash.hex(),
-                bytes: imported.bytes.len() as u64,
-                source: imported.source_str.clone(),
-                cells: imported.cells.clone(),
-                diagnostics: imported.diagnostics.clone(),
-            },
-        );
+        cache.publish(&cached, imported);
     }
     Ok(cached)
 }
