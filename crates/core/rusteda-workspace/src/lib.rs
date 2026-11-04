@@ -59,7 +59,7 @@ pub mod sta;
 pub mod text;
 pub mod workspace;
 
-pub use cache::{CachedLibrary, LibraryCache, PutError};
+pub use cache::{CachedLibrary, LibraryCache, PutError, SharedLibrary, SharedLibraryCache};
 pub use envelope::{
     DiagCode, DiagLocation, Diagnostic, Envelope, ErrorInfo, JsonObject, RawJson, Severity,
 };

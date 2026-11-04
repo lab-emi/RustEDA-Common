@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2026 RustEDA contributors
 
-//! The library cache (WS-REQ-0080 to WS-REQ-0082) and the library entries of a revision
-//! (WS-REQ-0073).
+//! The library cache (WS-REQ-0080 to WS-REQ-0082), the shared library cache (WS-REQ-0085 to
+//! WS-REQ-0087) and the library entries of a revision (WS-REQ-0073).
 
 mod common;
 
 use std::cell::Cell;
 use std::fs;
 
-use common::{entries, inv, new_workspace};
+use common::{entries, inv, new_workspace, temp_dir};
 use rusteda_workspace::{
     Error, ErrorCode, Hash64, JsonMap, LibraryEntry, PutError, Rbin, RbinWriter, Rev,
+    SharedLibraryCache,
 };
 
 /// A stand-in compiler: an rbin of kind LIBERTY whose section 1 holds the library bytes
@@ -418,4 +419,185 @@ fn library_entries_point_into_the_cache() {
     assert!(err.to_string().contains("appears twice"), "{err}");
     fs::write(&meta, &text).unwrap();
     ws.revision(Rev(1)).unwrap();
+}
+
+#[cfg(unix)]
+fn inode(path: &std::path::Path) -> u64 {
+    use std::os::unix::fs::MetadataExt;
+    fs::metadata(path).unwrap().ino()
+}
+
+// WS-REQ-0085 to WS-REQ-0087: a library compiled for one workspace is published to the shared
+// directory and adopted by another workspace as the same files (hard links), byte for byte;
+// nothing is written when the workspace has the library already.
+#[cfg(unix)]
+#[test]
+fn shared_cache_publishes_and_adopts_the_same_files() {
+    let a = new_workspace("shared-a");
+    let b = new_workspace("shared-b");
+    let shared = SharedLibraryCache::new(temp_dir("shared-dir").join("libs"));
+    let lib_bytes = b"library (cells_a) { }";
+    let hash = Hash64::of(lib_bytes);
+    let h16 = hash.hex();
+    assert!(
+        shared.find(hash).unwrap().is_empty(),
+        "a missing directory has nothing"
+    );
+
+    let put = a
+        .cache()
+        .put_library("cells_a", lib_bytes, "LIBERTY", 1..=1, |b: &[u8]| {
+            Ok::<_, String>(reversed(b))
+        })
+        .unwrap();
+    shared.publish(&put, b"record one").unwrap();
+    assert_eq!(
+        entries(shared.dir()),
+        [
+            format!("cells_a-{h16}.json"),
+            format!("cells_a-{h16}.lib"),
+            format!("cells_a-{h16}.rlib")
+        ]
+    );
+    assert_eq!(
+        inode(&shared.dir().join(format!("cells_a-{h16}.rlib"))),
+        inode(&put.rlib_path)
+    );
+
+    let found = shared.find(hash).unwrap();
+    assert_eq!(found.len(), 1);
+    assert_eq!(
+        (found[0].name.as_str(), found[0].record.as_slice()),
+        ("cells_a", &b"record one"[..])
+    );
+    assert!(shared.find(Hash64::of(b"other")).unwrap().is_empty());
+
+    let adopted = b
+        .cache()
+        .put_shared(&found[0], lib_bytes, "LIBERTY", 1..=1)
+        .unwrap()
+        .expect("verified shared files are adopted");
+    assert!(!adopted.compiled_now);
+    assert_eq!(
+        (adopted.lib.clone(), adopted.rlib.clone()),
+        (put.lib.clone(), put.rlib.clone())
+    );
+    assert_eq!(fs::read(&adopted.lib_path).unwrap(), lib_bytes);
+    assert_eq!(
+        fs::read(&adopted.rlib_path).unwrap(),
+        fs::read(&put.rlib_path).unwrap()
+    );
+    assert_eq!(
+        inode(&adopted.rlib_path),
+        inode(&put.rlib_path),
+        "linked, not copied"
+    );
+    assert_eq!(
+        entries(&b.cache().dir()),
+        [format!("cells_a-{h16}.lib"), format!("cells_a-{h16}.rlib")],
+        "no temporary file is left"
+    );
+    // The adopted library is a current library of the workspace cache.
+    assert!(
+        b.cache()
+            .open_rlib("cells_a", hash, "LIBERTY", 1..=1)
+            .is_ok()
+    );
+    let again = b
+        .cache()
+        .put_library("cells_a", lib_bytes, "LIBERTY", 1..=1, |_: &[u8]| {
+            Err::<Vec<u8>, _>("no compile expected")
+        })
+        .unwrap();
+    assert!(!again.compiled_now);
+
+    // Publishing again replaces the record.
+    shared.publish(&put, b"record two").unwrap();
+    assert_eq!(shared.find(hash).unwrap()[0].record, b"record two");
+}
+
+// WS-REQ-0086: shared files that do not verify are not adopted, and nothing is left behind:
+// other bytes, a damaged or foreign .rlib, a .lib with other content, a symbolic link.
+#[cfg(unix)]
+#[test]
+fn shared_cache_rejects_files_that_do_not_verify() {
+    let a = new_workspace("shared-bad-a");
+    let shared = SharedLibraryCache::new(temp_dir("shared-bad-dir").join("libs"));
+    let lib_bytes = b"library (cells_a) { }";
+    let hash = Hash64::of(lib_bytes);
+    let h16 = hash.hex();
+    let put = a
+        .cache()
+        .put_library("cells_a", lib_bytes, "LIBERTY", 1..=1, |b: &[u8]| {
+            Ok::<_, String>(reversed(b))
+        })
+        .unwrap();
+    shared.publish(&put, b"{}").unwrap();
+    let entry = shared.find(hash).unwrap().remove(0);
+    let fresh = |name: &str| new_workspace(name);
+
+    // Other bytes than the entry's.
+    let w = fresh("shared-bad-bytes");
+    assert!(
+        w.cache()
+            .put_shared(&entry, b"library (x) { }", "LIBERTY", 1..=1)
+            .unwrap()
+            .is_none()
+    );
+    assert!(!w.cache().dir().exists() || entries(&w.cache().dir()).is_empty());
+
+    // A .rlib of another kind or a damaged one (replaced by a rename, as every writer does).
+    let rlib = shared.dir().join(format!("cells_a-{h16}.rlib"));
+    for bad in [
+        RbinWriter::new("NETLIST", 1).unwrap().to_bytes(),
+        b"not an rbin".to_vec(),
+    ] {
+        let tmp = shared.dir().join("tmp");
+        fs::write(&tmp, &bad).unwrap();
+        fs::rename(&tmp, &rlib).unwrap();
+        let w = fresh("shared-bad-rlib");
+        assert!(
+            w.cache()
+                .put_shared(&entry, lib_bytes, "LIBERTY", 1..=1)
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            entries(&w.cache().dir()).is_empty(),
+            "{:?}",
+            entries(&w.cache().dir())
+        );
+    }
+    // A symbolic link in place of the .rlib.
+    fs::remove_file(&rlib).unwrap();
+    std::os::unix::fs::symlink(&put.rlib_path, &rlib).unwrap();
+    let w = fresh("shared-bad-link");
+    assert!(
+        w.cache()
+            .put_shared(&entry, lib_bytes, "LIBERTY", 1..=1)
+            .unwrap()
+            .is_none()
+    );
+    assert!(entries(&w.cache().dir()).is_empty());
+    assert!(
+        shared.find(hash).unwrap().is_empty(),
+        "find skips a symbolic link"
+    );
+    fs::remove_file(&rlib).unwrap();
+
+    // A .lib whose content differs from the bytes, under the right name.
+    shared.publish(&put, b"{}").unwrap();
+    let lib = shared.dir().join(format!("cells_a-{h16}.lib"));
+    let tmp = shared.dir().join("tmp");
+    fs::write(&tmp, b"library (cells_b) { }").unwrap();
+    fs::rename(&tmp, &lib).unwrap();
+    let w = fresh("shared-bad-lib");
+    let entry = shared.find(hash).unwrap().remove(0);
+    assert!(
+        w.cache()
+            .put_shared(&entry, lib_bytes, "LIBERTY", 1..=1)
+            .unwrap()
+            .is_none()
+    );
+    assert!(entries(&w.cache().dir()).is_empty());
 }

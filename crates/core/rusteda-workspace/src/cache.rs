@@ -22,6 +22,14 @@
 //! [`Revision::open_library`](crate::Revision::open_library), never for an arbitrary directory,
 //! because its compiled libraries are mapped (WS-REQ-0037). The cache reads regular files only
 //! and never follows a symbolic link (WS-REQ-0025).
+//!
+//! A [`SharedLibraryCache`] is a directory that several workspaces share, so that a library
+//! compiled for one of them is not compiled again for the next (WS-REQ-0085 to WS-REQ-0087).
+//! It holds the same two files per library, named the same way, plus a record that the
+//! importing tool writes. A workspace never maps a file of the shared directory: it adopts a
+//! library by hard-linking the two files into its own cache ([`LibraryCache::put_shared`]),
+//! verifying the linked files first, and since every file of both directories is replaced only
+//! by a rename, never written in place, the linked files keep the guarantee of WS-REQ-0037.
 
 use std::fs;
 use std::ops::RangeInclusive;
@@ -154,6 +162,84 @@ impl LibraryCache {
         Ok(library)
     }
 
+    /// Stores the library `shared` of a [`SharedLibraryCache`] in this cache instead of
+    /// compiling it (WS-REQ-0086), as [`LibraryCache::put_library`] would store `lib_bytes`:
+    /// nothing is written when both files exist here and the `.rlib` is current. Otherwise the
+    /// missing or stale files are hard-linked from the shared directory (copied where a link
+    /// is not possible) under temporary names, verified there, and renamed into place: the
+    /// `.lib` must hold exactly `lib_bytes` and the `.rlib` must be a valid rbin file of `kind`
+    /// and `versions` (structure and content hash). `None` when a shared file is missing, of
+    /// another type, cannot be linked or read, or fails a check; nothing is then left in this
+    /// cache, and the caller compiles the library itself. A library adopted this way is
+    /// byte for byte the library the tool that published it compiled, so a tool must accept
+    /// only libraries it compiled itself (see [`SharedLibraryCache`]).
+    pub fn put_shared(
+        &self,
+        shared: &SharedLibrary,
+        lib_bytes: &[u8],
+        kind: &str,
+        versions: RangeInclusive<u32>,
+    ) -> Result<Option<CachedLibrary>> {
+        check_library_name(&shared.name)?;
+        if Hash64::of(lib_bytes) != shared.hash {
+            return Ok(None);
+        }
+        let library = self.located(&shared.name, shared.hash);
+        let has_lib = is_regular_file(&library.lib_path);
+        let current = is_current_rlib(&library.rlib_path, kind, &versions)?;
+        if has_lib && current {
+            return Ok(Some(library));
+        }
+        fsutil::create_dir_all(&self.dir())?;
+        let mut wanted: Vec<(&Path, &Path, bool)> = Vec::new();
+        if !has_lib {
+            wanted.push((&shared.lib_path, &library.lib_path, true));
+        }
+        if !current {
+            wanted.push((&shared.rlib_path, &library.rlib_path, false));
+        }
+        let mut staged: Vec<(PathBuf, &Path)> = Vec::new();
+        let mut verified = true;
+        for (from, to, is_lib) in wanted {
+            let tmp = temporary_name(to);
+            if fsutil::check_regular(from).is_err() || fsutil::link_or_copy(from, &tmp).is_err() {
+                let _ = fs::remove_file(&tmp);
+                verified = false;
+                break;
+            }
+            // The linked file itself is checked, so a concurrent replacement of the shared
+            // file cannot slip in between the check and the rename.
+            verified = if is_lib {
+                fsutil::read_regular(&tmp).is_ok_and(|bytes| bytes == lib_bytes)
+            } else {
+                is_current_rlib(&tmp, kind, &versions).unwrap_or(false)
+            };
+            staged.push((tmp, to));
+            if !verified {
+                break;
+            }
+        }
+        if !verified {
+            for (tmp, _) in &staged {
+                let _ = fs::remove_file(tmp);
+            }
+            return Ok(None);
+        }
+        for (i, (tmp, to)) in staged.iter().enumerate() {
+            let renamed = fsutil::rename(tmp, to);
+            // A rename between two links of one file does nothing and leaves both names.
+            let _ = fs::remove_file(tmp);
+            if let Err(e) = renamed {
+                for (rest, _) in &staged[i + 1..] {
+                    let _ = fs::remove_file(rest);
+                }
+                return Err(e);
+            }
+        }
+        fsutil::fsync_dir(&self.dir())?;
+        Ok(Some(library))
+    }
+
     /// Compiles the cached verbatim library again and replaces its `.rlib` atomically, e.g.
     /// after a format version change (WS-REQ-0083). The verbatim copy must still hash to
     /// `hash` (otherwise `CORRUPT_TABLE`), and the compiled bytes must be a valid rbin file of
@@ -258,6 +344,167 @@ impl LibraryCache {
                 Ok(self.open_rlib(name, hash, kind, versions)?)
             }
             opened => Ok(opened?),
+        }
+    }
+}
+
+/// A temporary name next to `path` for a file that is renamed to `path` once complete.
+fn temporary_name(path: &Path) -> PathBuf {
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    fsutil::parent_dir(path).join(format!(".{name}.tmp-{}", fsutil::unique_suffix()))
+}
+
+/// Whether `a` and `b` are the same file (device and inode), neither followed if a link.
+fn same_file(a: &Path, b: &Path) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        match (fs::symlink_metadata(a), fs::symlink_metadata(b)) {
+            (Ok(x), Ok(y)) => x.dev() == y.dev() && x.ino() == y.ino(),
+            _ => false,
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (a, b);
+        false
+    }
+}
+
+/// The largest record of a [`SharedLibraryCache`] that is read.
+pub const MAX_SHARED_RECORD_BYTES: u64 = 16 << 20;
+
+/// A directory of compiled libraries shared by the caches of several workspaces (WS-REQ-0085),
+/// such as all the workspaces of one flow run (`rusteda import --lib-cache DIR`).
+///
+/// Library `name` with the xxh3-64 `h16` of its bytes is kept as `<name>-<h16>.lib` (verbatim)
+/// and `<name>-<h16>.rlib` (compiled), as in a workspace cache, and with `<name>-<h16>.json`,
+/// a record of the tool that published it. The directory never compiles anything: a tool
+/// publishes a library it compiled into a workspace ([`SharedLibraryCache::publish`]), and a
+/// later import finds it by the hash of its bytes ([`SharedLibraryCache::find`]) and adopts it
+/// into another workspace ([`LibraryCache::put_shared`]), which verifies the files it links.
+/// What the record holds is the tool's business; it must let the tool accept only libraries
+/// that it compiled itself, from the same bytes (for `rusteda import`, the hash of its own
+/// executable, the bytes and their source, RCLI-REQ-0025). Every file is written under a
+/// temporary name and renamed, never written in place, so concurrent imports are harmless and
+/// a linked file never changes.
+#[derive(Debug, Clone)]
+pub struct SharedLibraryCache {
+    dir: PathBuf,
+}
+
+/// A library of a [`SharedLibraryCache`], found by the hash of its bytes (WS-REQ-0085).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SharedLibrary {
+    /// The library name.
+    pub name: String,
+    /// The hash of the library bytes.
+    pub hash: Hash64,
+    /// The record stored with the library.
+    pub record: Vec<u8>,
+    /// The verbatim copy, `<dir>/<name>-<h16>.lib`.
+    pub lib_path: PathBuf,
+    /// The compiled library, `<dir>/<name>-<h16>.rlib`.
+    pub rlib_path: PathBuf,
+}
+
+impl SharedLibraryCache {
+    /// The shared cache in `dir`, which is created when a library is published.
+    pub fn new(dir: impl Into<PathBuf>) -> SharedLibraryCache {
+        SharedLibraryCache { dir: dir.into() }
+    }
+
+    /// The directory.
+    pub fn dir(&self) -> &Path {
+        &self.dir
+    }
+
+    fn paths(&self, name: &str, hash: Hash64) -> (PathBuf, PathBuf, PathBuf) {
+        let stem = format!("{name}-{}", hash.hex());
+        (
+            self.dir.join(format!("{stem}.lib")),
+            self.dir.join(format!("{stem}.rlib")),
+            self.dir.join(format!("{stem}.json")),
+        )
+    }
+
+    /// Every library stored with `hash`, whatever its name, sorted by name, with its record:
+    /// those whose `.lib`, `.rlib` and record exist as regular files (a symbolic link is not
+    /// followed, WS-REQ-0025) and whose record is at most [`MAX_SHARED_RECORD_BYTES`]. Nothing
+    /// else is checked here; [`LibraryCache::put_shared`] verifies the files it adopts. A
+    /// missing directory has no libraries.
+    pub fn find(&self, hash: Hash64) -> Result<Vec<SharedLibrary>> {
+        let suffix = format!("-{}.lib", hash.hex());
+        let entries = match fs::read_dir(&self.dir) {
+            Ok(entries) => entries,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(e) => return Err(Error::io(&self.dir, e)),
+        };
+        let mut found = Vec::new();
+        for entry in entries {
+            let entry = entry.map_err(|e| Error::io(&self.dir, e))?;
+            let Ok(file) = entry.file_name().into_string() else {
+                continue;
+            };
+            let Some(name) = file.strip_suffix(&suffix) else {
+                continue;
+            };
+            if !is_library_name(name) {
+                continue;
+            }
+            let (lib_path, rlib_path, record_path) = self.paths(name, hash);
+            let record_size = fs::symlink_metadata(&record_path)
+                .ok()
+                .filter(|m| m.file_type().is_file())
+                .map(|m| m.len());
+            if !is_regular_file(&lib_path)
+                || !is_regular_file(&rlib_path)
+                || !record_size.is_some_and(|n| n <= MAX_SHARED_RECORD_BYTES)
+            {
+                continue;
+            }
+            let Ok(record) = fsutil::read_regular(&record_path) else {
+                continue;
+            };
+            found.push(SharedLibrary {
+                name: name.to_string(),
+                hash,
+                record,
+                lib_path,
+                rlib_path,
+            });
+        }
+        found.sort_by(|a, b| a.name.cmp(&b.name));
+        Ok(found)
+    }
+
+    /// Publishes the library `cached` of a workspace cache with `record` (WS-REQ-0087): its
+    /// `.lib` and `.rlib` are hard-linked into the directory (copied where a link is not
+    /// possible) and the record written, each under a temporary name that is then renamed, the
+    /// record last; the directory is created when missing, and an entry of the same name and
+    /// hash is replaced. The caller has just stored or verified `cached` in its workspace.
+    pub fn publish(&self, cached: &CachedLibrary, record: &[u8]) -> Result<()> {
+        check_library_name(&cached.name)?;
+        fsutil::create_dir_all(&self.dir)?;
+        let (lib_path, rlib_path, record_path) = self.paths(&cached.name, cached.hash);
+        for (from, to) in [(&cached.lib_path, lib_path), (&cached.rlib_path, rlib_path)] {
+            fsutil::check_regular(from)?;
+            if same_file(from, &to) {
+                continue;
+            }
+            let tmp = temporary_name(&to);
+            fsutil::link_or_copy(from, &tmp)?;
+            let renamed = fsutil::rename(&tmp, &to);
+            // A rename between two links of one file does nothing and leaves both names.
+            let _ = fs::remove_file(&tmp);
+            renamed?;
+        }
+        match fsutil::replace(&record_path, record)? {
+            fsutil::Replaced::Durable => Ok(()),
+            fsutil::Replaced::NotDurable(e) => Err(e),
         }
     }
 }

@@ -11,7 +11,7 @@ use rusteda_workspace::{
 };
 
 use crate::OutputOutcome;
-use crate::import_lib::import_libs;
+use crate::import_lib::{LibCache, import_libs};
 use crate::import_netlist::import_netlist;
 use crate::import_rtl::{RtlImportArgs, import_rtl};
 use crate::import_sdc::import_sdc;
@@ -22,6 +22,8 @@ pub(crate) struct ImportCommand {
     pub base_rev: String,
     pub message: Option<String>,
     pub libs: Vec<(PathBuf, String)>,
+    /// The shared compile cache of `--lib-cache` (RCLI-REQ-0025).
+    pub lib_cache: Option<PathBuf>,
     pub rtl: Option<RtlImportArgs>,
     pub netlist: Option<PathBuf>,
     /// Budget of the full netlist reader in MiB (RCLI-REQ-0024).
@@ -71,7 +73,18 @@ pub(crate) fn run_import(
     let mut metrics = JsonMap::new();
     let step_res = (|| -> Result<(), Error> {
         if !cmd.libs.is_empty() {
-            import_libs(ws, &mut txn, &cmd.libs, &mut metrics, diags)?;
+            let lib_cache = match &cmd.lib_cache {
+                Some(dir) => LibCache::open(dir)?,
+                None => None,
+            };
+            import_libs(
+                ws,
+                &mut txn,
+                &cmd.libs,
+                lib_cache.as_ref(),
+                &mut metrics,
+                diags,
+            )?;
         }
         if let Some(rtl_args) = &cmd.rtl {
             import_rtl(&mut txn, rtl_args, &mut metrics, diags)?;
