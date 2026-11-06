@@ -119,8 +119,8 @@ impl<F: FnMut(f64) -> (f64, f64)> Charge<'_, F> {
         let duration =
             slew * self.thresholds.derate / (self.thresholds.upper - self.thresholds.lower);
         let nominal = cap * ramp_voltage(duration, duration, self.resistance * cap);
-        let actual = self.pi.near * self.poles.root(duration, duration)
-            + self.pi.far * self.poles.far(duration, duration);
+        let (root, far) = self.poles.root_and_far(duration, duration);
+        let actual = self.pi.near * root + self.pi.far * far;
         let residual = (nominal - actual) / self.pi.total();
         if !residual.is_finite() {
             return Err(ComputeError::Invalid("RC charge residual overflow".into()));

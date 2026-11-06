@@ -13,7 +13,7 @@ protocol, the library cache and the `rusteda.v1` JSON envelope and text-mode ren
 | [Workspace JSON schemas](#workspace-json-schemas) | WS-REQ-0040 to 0046 |
 | [Locks](#locks) | WS-REQ-0050 to 0052 |
 | [Commit protocol](#commit-protocol) | WS-REQ-0060 to 0079 |
-| [Library cache](#library-cache) | WS-REQ-0080 to 0082 |
+| [Library cache](#library-cache) | WS-REQ-0080 to 0087 |
 | [Envelope and text mode](#envelope-and-text-mode) | WS-REQ-0090 to 0097 |
 | [Determinism](#determinism) | WS-REQ-0100 |
 | [Compiled Liberty libraries (`rlib.md`)](rlib.md) | WS-REQ-0110 to 0117 |
@@ -163,6 +163,12 @@ protocol, the library cache and the `rusteda.v1` JSON envelope and text-mode ren
 **WS-REQ-0083** `LibraryCache::put_library` and `recompile` validate that the compiled `.rlib` matches the requested rbin `kind` and `versions`; a cached `.rlib` of an older format version or another kind is recompiled from the cached `.lib`, whereas a newer format version fails with `SCHEMA_TOO_NEW`.
 
 **WS-REQ-0084** `LibraryCache::open_rlib_or_recompile` and `Revision::open_library_or_recompile` open a compiled library and automatically recompile it once from the verbatim cached `.lib` when the `.rlib` is missing, damaged, or of an older format version.
+
+**WS-REQ-0085** A `SharedLibraryCache` is a directory shared by the caches of several workspaces: library `<name>` with bytes of hash `<h16>` is kept as `<name>-<h16>.rlib`, a copy of its compiled form, and `<name>-<h16>.json`, a record of the tool that published it, which holds the length and xxh3-64 of that `.rlib` (`CompiledDigest`); `find(hash)` returns, sorted by name, every library of that hash whose `.rlib` and record are regular files (symbolic links are not followed) with a record of at most 16 MiB, and a missing directory has none.
+
+**WS-REQ-0086** `LibraryCache::put_shared(shared, bytes, compiled, kind, versions)` stores a shared library in a workspace cache without compiling it: nothing is written when both files exist and the `.rlib` is current (as `put_library`). Otherwise the shared `.rlib` is read once (its length is checked before it is read) and must have exactly the length and xxh3-64 of `compiled`, as recorded when it was published, and be a valid rbin file of `kind` and `versions`; only then are the missing or stale files written atomically into the workspace cache, the `.lib` from `bytes` and the `.rlib` from the very bytes verified. A shared `.rlib` that is missing, of another type, unreadable, of another length or hash (replaced by another publisher, damaged, or the compile of other bytes) or invalid makes the result `None`, and nothing is written. The files it writes are the workspace's own, never links of a shared file, so WS-REQ-0037 holds whatever later happens to the shared directory.
+
+**WS-REQ-0087** `SharedLibraryCache::publish(cached, record)` reads the `.rlib` of a library of a workspace cache once, writes a copy of those bytes into the shared directory and then the record that `record` makes from their `CompiledDigest`, each under a temporary name that is fsynced and renamed; an entry of the same name and hash is replaced, and the workspace's file stays its own.
 
 ## Envelope and text mode
 

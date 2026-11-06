@@ -18,6 +18,8 @@
 //! - a [`JsonObject`] keeps its keys in insertion order, also for keys known only at run time
 //!   (per corner, per clock);
 //! - [`RawJson::parse`] keeps the text it is given;
+//! - [`JsonObject::insert_raw`] and [`RawJson::array`] splice values as they are, without
+//!   parsing them again, which keeps deeply nested reports linear in their size;
 //! - [`JsonObject`] and [`RawJson`] implement `Serialize` in that order, so they keep it as
 //!   fields of a struct too (a per-corner slack inside each `top_paths` entry); their numbers
 //!   are then written from their values (`1.50` becomes `1.5`);
@@ -87,6 +89,28 @@ impl RawJson {
         json::reformat(text, JsonStyle::Compact)
             .map(RawJson)
             .map_err(|e| Error::internal(format!("envelope value: {e}")))
+    }
+
+    /// The JSON array of `items`, in order. The items are spliced as they are, so no text is
+    /// parsed again and numbers keep their text, as [`JsonObject::insert_raw`] keeps a value;
+    /// every item is valid JSON without duplicate keys, so the array is too (WS-REQ-0091).
+    /// Serializing a `Vec<JsonObject>` with [`RawJson::new`] gives the same text for objects
+    /// whose numbers were serialized from their values (as [`JsonObject::insert`] does), but
+    /// it parses every item once per level of nesting.
+    pub fn array<I>(items: I) -> RawJson
+    where
+        I: IntoIterator,
+        I::Item: Into<RawJson>,
+    {
+        let mut text = String::from("[");
+        for (i, item) in items.into_iter().enumerate() {
+            if i > 0 {
+                text.push(',');
+            }
+            text.push_str(item.into().as_str());
+        }
+        text.push(']');
+        RawJson(text)
     }
 
     /// `null`.

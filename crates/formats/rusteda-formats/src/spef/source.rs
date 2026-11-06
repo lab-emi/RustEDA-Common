@@ -33,6 +33,17 @@ pub struct DecodedSource {
 /// Decode plain or concatenated gzip members under the same byte cap.
 /// CRC/truncation failures are errors, including an invalid trailing member.
 pub fn decode_source(bytes: &[u8], limits: Limits) -> Result<DecodedSource, Error> {
+    decode(bytes, None, limits)
+}
+
+/// [`decode_source`] of owned bytes: a plain source becomes the text without a copy.
+pub fn decode_source_owned(bytes: Vec<u8>, limits: Limits) -> Result<DecodedSource, Error> {
+    decode(&[], Some(bytes), limits)
+}
+
+/// Decodes `owned` when given, otherwise `borrowed`.
+fn decode(borrowed: &[u8], owned: Option<Vec<u8>>, limits: Limits) -> Result<DecodedSource, Error> {
+    let bytes = owned.as_deref().unwrap_or(borrowed);
     limits.validate()?;
     if bytes.len() > limits.max_bytes {
         return Err(Error::new(0, "T0072", "SPEF source byte budget exceeded"));
@@ -50,7 +61,11 @@ pub fn decode_source(bytes: &[u8], limits: Limits) -> Result<DecodedSource, Erro
         }
         (out, SourceEncoding::Gzip)
     } else {
-        (bytes.to_vec(), SourceEncoding::Plain)
+        let plain = match owned {
+            Some(owned) => owned,
+            None => bytes.to_vec(),
+        };
+        (plain, SourceEncoding::Plain)
     };
     let text = String::from_utf8(decoded)
         .map_err(|_| Error::new(0, "T0071", "SPEF source is not UTF-8"))?;
@@ -78,6 +93,15 @@ mod tests {
         let mut multi = gzip(b"first");
         multi.extend(gzip(b"second"));
         assert_eq!(decode_source(&multi, limits).unwrap().text, "firstsecond");
+        for bytes in [plain.to_vec(), gzip(plain), multi.clone(), vec![0xff]] {
+            let borrowed = decode_source(&bytes, limits);
+            let owned = decode_source_owned(bytes, limits);
+            match (borrowed, owned) {
+                (Ok(a), Ok(b)) => assert_eq!((a.text, a.encoding), (b.text, b.encoding)),
+                (Err(a), Err(b)) => assert_eq!(a, b),
+                _ => panic!("owned and borrowed decoding disagree"),
+            }
+        }
         let mut corrupt = gzip(plain);
         let last = corrupt.len() - 8;
         corrupt[last] ^= 1;

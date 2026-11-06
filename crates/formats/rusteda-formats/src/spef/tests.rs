@@ -9,7 +9,7 @@ fn source() -> String {
 #[test]
 fn mapped_units_and_metadata() {
     let s = read(&source(), Limits::default()).unwrap();
-    assert_eq!(s.nets[0].nodes[1].name, "u:A");
+    assert_eq!(s.nets[0].nodes.name(1), "u:A");
     assert_eq!(s.nets[0].total_cap_pf, 0.006);
     assert_eq!(s.nets[0].resistors[0].kohm, 0.01);
     assert_eq!(s.node_count, 2);
@@ -83,7 +83,7 @@ fn explicit_grounding_and_total() {
     let s = read(&text, Limits::default()).unwrap();
     assert_eq!(s.coupling_records, 1);
     assert_eq!(s.nets[0].nodes.len(), 2);
-    assert_eq!(s.nets[0].nodes[1].cap_pf, 0.006);
+    assert_eq!(s.nets[0].nodes.cap_pf(1), 0.006);
     assert!(read(&text.replace("remote:1", "a"), Limits::default()).is_err());
 }
 
@@ -119,6 +119,129 @@ fn rejects_invalid_public_rc_models() {
     assert!(bad.validate(Limits::default()).is_err());
     assert_eq!(bad.estimated_state_bytes(), good.estimated_state_bytes());
     let mut bad = good;
-    bad.nets[0].nodes[0].cap_pf = f64::INFINITY;
+    bad.nets[0].nodes.caps_mut()[0] = f64::INFINITY;
     assert!(bad.validate(Limits::default()).is_err());
+}
+
+// RCLI-REQ-0071, RCLI-REQ-0072: the counting parse reports the counts of the full parse and fails
+// exactly when it fails, with the same error, for valid, corrupt and over-budget sources.
+#[test]
+fn counting_parse_matches_the_full_parse() {
+    let two_nets = source().replace(
+        "*END\n",
+        "*END\n*D_NET *2 1\n*CONN\n*I *2:A I\n*CAP\n1 *2:A 1\n*END\n",
+    );
+    let mut texts = vec![
+        source(),
+        two_nets.clone(),
+        two_nets.replace("*D_NET *2", "*D_NET *1"),
+    ];
+    for (from, to) in [
+        ("*END", ""),
+        ("*D_NET", "*R_NET"),
+        ("1 a 1", "1 a NaN"),
+        ("*2:A I", "*99:A I"),
+        ("*CONN", "*INDUC"),
+        ("*1 a", "*1 a\n*1 a"),
+        ("*D_NET *1 3", "*D_NET *1 9"),
+        ("*NAME_MAP", "*D_NET *1 3\n*END\n*NAME_MAP"),
+        ("2 *2:A 2", "2 *2:A 2\n3 *2:A remote:1 1"),
+    ] {
+        texts.push(source().replace(from, to));
+    }
+    let limits = [
+        Limits::default(),
+        Limits {
+            max_nets: 1,
+            ..Limits::default()
+        },
+        Limits {
+            max_nodes: 2,
+            ..Limits::default()
+        },
+        Limits {
+            max_elements: 3,
+            ..Limits::default()
+        },
+        Limits {
+            max_name_bytes: 8,
+            ..Limits::default()
+        },
+    ];
+    let mut both = 0;
+    for text in &texts {
+        for limits in limits {
+            let full = read(text, limits).map(|s| Counts {
+                nets: s.nets.len(),
+                node_count: s.node_count,
+                element_count: s.element_count,
+                coupling_records: s.coupling_records,
+            });
+            both += usize::from(full.is_ok());
+            assert_eq!(count(text, limits), full, "{text}");
+        }
+    }
+    assert!(both >= 3, "{both}");
+}
+
+// RCLI-REQ-0071: a name map key is its text: `*02`, `*2` and a key of more digits than a 64-bit
+// number holds are three keys, each resolved to its own name, and a key given twice is a
+// duplicate however it is spelled.
+#[test]
+fn name_map_keys_are_their_text() {
+    let long = "*123456789012345678901";
+    let text = source()
+        .replace("*2 u\n", &format!("*2 u\n*02 v\n{long} w\n"))
+        .replace("*2:A", "*02:A");
+    let s = read(&text, Limits::default()).unwrap();
+    assert_eq!(s.nets[0].nodes.name(1), "v:A");
+    let text = source()
+        .replace("*2 u\n", &format!("*2 u\n*02 v\n{long} w\n"))
+        .replace("*2:A", &format!("{long}:A"));
+    let s = read(&text, Limits::default()).unwrap();
+    assert_eq!(s.nets[0].nodes.name(1), "w:A");
+    for dup in ["*02 v\n*02 x\n", &format!("{long} v\n{long} x\n")] {
+        let text = source().replace("*2 u\n", &format!("*2 u\n{dup}"));
+        assert_eq!(
+            read(&text, Limits::default()).unwrap_err().message,
+            "duplicate name map id"
+        );
+    }
+}
+
+// RCLI-REQ-0074: the nodes of a net keep their names and capacitances by index.
+#[test]
+fn nodes_by_index() {
+    let mut nodes = Nodes::new();
+    assert!(nodes.is_empty() && nodes.get(0).is_none());
+    nodes.push("a", 1.0);
+    nodes.push("", 0.0);
+    nodes.push("u:A", 2.5);
+    assert_eq!(nodes.len(), 3);
+    assert_eq!(
+        (nodes.name(0), nodes.name(1), nodes.name(2)),
+        ("a", "", "u:A")
+    );
+    assert_eq!(nodes.caps(), &[1.0, 0.0, 2.5]);
+    nodes.caps_mut()[1] = 4.0;
+    let all: Vec<Node<'_>> = nodes.iter().collect();
+    assert_eq!(
+        all,
+        [
+            Node {
+                name: "a",
+                cap_pf: 1.0
+            },
+            Node {
+                name: "",
+                cap_pf: 4.0
+            },
+            Node {
+                name: "u:A",
+                cap_pf: 2.5
+            },
+        ]
+    );
+    assert_eq!(nodes.get(2), Some(all[2]));
+    assert_eq!(nodes.name_bytes(), 4);
 }

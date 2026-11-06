@@ -485,3 +485,129 @@ fn the_sources_of_a_table_are_bounded_together() {
     );
     fs::remove_dir_all(&dir).unwrap();
 }
+
+// RCLI-REQ-0073, RCLI-REQ-0075: one source text given for several corners, as a plain file, as a
+// gzip file and as a plain copy at another path, is parsed once and the copy is not read into a
+// second text; every corner keeps its own metrics, source identity and section of the decoded
+// text, as an import of that corner alone records them. Another source of the same length is
+// parsed on its own.
+#[test]
+fn one_source_of_several_corners_is_read_once() {
+    use rusteda_formats::spef::CornerSetMetadata;
+    use std::io::Write;
+    let dir = std::env::temp_dir().join(format!("spef-shared-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    let ws_path = dir.join("ws");
+    let w = ws_path.to_str().unwrap();
+    let lib = dir.join("cells.lib");
+    let net = dir.join("top.v");
+    fs::write(&lib, "library (l) { time_unit : \"1ns\"; capacitive_load_unit(1,pf); cell(BUF){pin(A){direction:input;}pin(Y){direction:output;function:\"A\";}}}").unwrap();
+    fs::write(
+        &net,
+        "module top(input a,output y);BUF u(.A(a),.Y(y));endmodule\n",
+    )
+    .unwrap();
+    let text = |res: u32| {
+        format!(
+            "*SPEF \"ieee 1481-1999\"\n*DESIGN top\n*DIVIDER /\n*DELIMITER :\n*BUS_DELIMITER []\n*T_UNIT 1 NS\n*C_UNIT 1 PF\n*R_UNIT 1 OHM\n*D_NET a 0.003\n*CONN\n*P a I\n*I u:A I\n*CAP\n1 a 0.001\n2 u:A 0.002\n*RES\n1 a u:A {res}\n*END\n*D_NET y 0.004\n*CONN\n*P y O\n*I u:Y O\n*CAP\n1 u:Y 0.004\n*RES\n1 u:Y y 2\n*END\n"
+        )
+    };
+    let (shared, other) = (text(3), text(5));
+    let plain = dir.join("shared.spef");
+    let compressed = dir.join("shared.spef.gz");
+    let different = dir.join("other.spef");
+    let copy = dir.join("copy.spef");
+    fs::write(&plain, &shared).unwrap();
+    fs::write(&copy, &shared).unwrap();
+    let mut g = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
+    g.write_all(shared.as_bytes()).unwrap();
+    fs::write(&compressed, g.finish().unwrap()).unwrap();
+    fs::write(&different, &other).unwrap();
+    let (plain, compressed, different, copy) = (
+        plain.to_str().unwrap(),
+        compressed.to_str().unwrap(),
+        different.to_str().unwrap(),
+        copy.to_str().unwrap(),
+    );
+    assert_eq!(run(&["init", "-w", w])["new_rev"], "rev0");
+    let l = lib.to_str().unwrap();
+    let mut args = vec!["import", "-w", w, "--base-rev", "rev0"];
+    for corner in ["fast", "slow", "typ", "max"] {
+        args.extend(["--lib", l, "--corner", corner]);
+    }
+    args.extend(["--netlist", net.to_str().unwrap()]);
+    assert_eq!(run(&args)["new_rev"], "rev1");
+    let all = run(&[
+        "import",
+        "-w",
+        w,
+        "--base-rev",
+        "rev1",
+        "--spef",
+        plain,
+        "--spef-corner",
+        "fast",
+        "--spef",
+        compressed,
+        "--spef-corner",
+        "slow",
+        "--spef",
+        different,
+        "--spef-corner",
+        "typ",
+        "--spef",
+        copy,
+        "--spef-corner",
+        "max",
+    ]);
+    assert_eq!(all["ok"], true, "{all}");
+    let imported = &all["metrics"]["spef_imported"];
+    // Each corner alone, on the head revision.
+    let alone = |path: &str, corner: &str| {
+        let head = run(&["show", "-w", w])["rev"].as_str().unwrap().to_string();
+        let r = run(&[
+            "import",
+            "-w",
+            w,
+            "--base-rev",
+            &head,
+            "--spef",
+            path,
+            "--spef-corner",
+            corner,
+        ]);
+        assert_eq!(r["ok"], true, "{r}");
+        r["metrics"]["spef_imported"][corner].clone()
+    };
+    for (path, corner) in [
+        (plain, "fast"),
+        (compressed, "slow"),
+        (different, "typ"),
+        (copy, "max"),
+    ] {
+        assert_eq!(imported[corner], alone(path, corner), "{corner}: {all}");
+    }
+    assert_eq!(imported["fast"]["compression"], "plain");
+    assert_eq!(imported["slow"]["compression"], "gzip");
+    assert_eq!(imported["max"]["compression"], "plain");
+    for key in ["decoded_bytes", "nets", "nodes", "elements"] {
+        assert_eq!(imported["fast"][key], imported["slow"][key], "{key}");
+        assert_eq!(imported["fast"][key], imported["max"][key], "{key}");
+    }
+    // The table holds the decoded text of every corner in its own section.
+    let ws = Workspace::open(&ws_path).unwrap();
+    let rev = ws.revision(ws.resolve_query("rev2").unwrap()).unwrap();
+    let t = rev.open_rbin("parasitics", "PARASIT", 2..=2).unwrap();
+    let set: CornerSetMetadata = serde_json::from_slice(t.section_bytes(1).unwrap()).unwrap();
+    let names: Vec<&str> = set.corners.iter().map(|c| c.corner.as_str()).collect();
+    assert_eq!(names, ["fast", "max", "slow", "typ"]);
+    assert_eq!(t.section_bytes(2).unwrap(), shared.as_bytes());
+    assert_eq!(t.section_bytes(3).unwrap(), shared.as_bytes());
+    assert_eq!(t.section_bytes(4).unwrap(), shared.as_bytes());
+    assert_eq!(t.section_bytes(5).unwrap(), other.as_bytes());
+    // The copy keeps its own source identity.
+    assert_eq!(set.corners[1].source_path, copy);
+    drop((t, rev, ws));
+    fs::remove_dir_all(&dir).unwrap();
+}

@@ -14,6 +14,7 @@ use rusteda_core::netlist::{
     AssignRec, CONST0, CONST1, FrozenNetlist, InstRec, MAX_RANGE_WIDTH, NetRec, PinDir, PortDir,
     PortRec, SCALAR,
 };
+use rusteda_formats::verilog::netlist::pin_group;
 use rusteda_formats::verilog::number::{Bit4, Literal};
 use rusteda_formats::verilog::token::KEYWORDS;
 
@@ -670,6 +671,7 @@ pub(super) fn try_fast_flat<'a>(
     };
 
     let (mut lhs_buf, mut rhs_buf, mut conn_pins) = (Vec::new(), Vec::new(), Vec::new());
+    let mut group: Vec<u32> = Vec::new();
     loop {
         if cur.kw(b"endmodule")? {
             break;
@@ -795,11 +797,27 @@ pub(super) fn try_fast_flat<'a>(
                         return None;
                     }
                     let (ps, pe) = cur.ident()?;
-                    let &pin_idx = cinfo.pin_index.get(&text[ps..pe])?;
-                    if conn_pins.contains(&pin_idx) {
-                        return None;
+                    let pname = &text[ps..pe];
+                    // A pin, or the bit pins `pname[i]` of a bus in library order, connected bit
+                    // by bit to the expression as the netlist reader connects them (pin_group).
+                    group.clear();
+                    match cinfo.pin_index.get(pname) {
+                        Some(&pin_idx) => group.push(pin_idx),
+                        None => group.extend(pin_group(
+                            cinfo
+                                .pins
+                                .iter()
+                                .enumerate()
+                                .map(|(i, p)| (i as u32, p.0.as_str())),
+                            pname,
+                        )?),
                     }
-                    conn_pins.push(pin_idx);
+                    for &pin_idx in &group {
+                        if conn_pins.contains(&pin_idx) {
+                            return None;
+                        }
+                        conn_pins.push(pin_idx);
+                    }
                     if !cur.eat(b'(')? {
                         return None;
                     }
@@ -812,11 +830,13 @@ pub(super) fn try_fast_flat<'a>(
                             true,
                             &mut rhs_buf,
                         )?;
-                        if rhs_buf.len() != 1 || !cur.eat(b')')? {
+                        if rhs_buf.len() != group.len() || !cur.eat(b')')? {
                             return None;
                         }
-                        pin_cellpin.push(pin_idx);
-                        pin_net.push(rhs_buf[0]);
+                        for (&pin_idx, &net) in group.iter().zip(&rhs_buf) {
+                            pin_cellpin.push(pin_idx);
+                            pin_net.push(net);
+                        }
                     }
                     if cur.eat(b',')? {
                         continue;

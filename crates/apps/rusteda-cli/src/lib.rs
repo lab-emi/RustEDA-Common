@@ -163,6 +163,13 @@ pub struct ImportArgs {
     /// Liberty library file to import (repeatable).
     #[arg(long = "lib", action = clap::ArgAction::Append, value_name = "FILE")]
     pub libs: Vec<PathBuf>,
+    /// Compile cache shared with other workspaces (created when missing): a `--lib` that this
+    /// executable compiled there before, from the same bytes and path, is copied into the
+    /// workspace cache instead of parsed again, once its compiled form is exactly the recorded
+    /// one, and a library compiled here is added to it. The workspace gets the same files
+    /// either way, files of its own (RCLI-REQ-0025).
+    #[arg(long = "lib-cache", value_name = "DIR")]
+    pub lib_cache: Option<PathBuf>,
     /// Corner name for the preceding `--lib` (default `"default"`).
     #[arg(long = "corner", action = clap::ArgAction::Append, value_name = "NAME")]
     pub corners: Vec<String>,
@@ -805,6 +812,7 @@ pub fn run_with_version(args: Vec<OsString>, version: &'static str) -> ExitCode 
                 base_rev: imp.base_rev.clone(),
                 message: imp.message.clone(),
                 libs,
+                lib_cache: imp.lib_cache.clone(),
                 rtl: rtl_args,
                 netlist: imp.netlist.clone(),
                 max_netlist_ast_mib: imp.max_netlist_ast_mib,

@@ -16,6 +16,7 @@ use std::collections::BTreeMap;
 use std::fs::{self, OpenOptions};
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
 /// The table name and file of the parasitics.
 pub(crate) const TABLE: &str = "parasitics";
@@ -26,10 +27,20 @@ const MAX_METADATA_BYTES: usize = 64 * 4096;
 /// this many per-file byte budgets (RCLI-REQ-0075).
 const MAX_TABLE_SOURCES: usize = 8;
 
-/// One corner of the new table: its metadata and decoded source.
+/// One corner of the new table: its metadata and decoded source. Corners imported from
+/// identical sources in one import share one copy of the text.
 pub(crate) struct CornerEntry {
     pub(crate) source: CornerSource,
-    text: Vec<u8>,
+    text: Rc<Vec<u8>>,
+}
+
+/// The counts of one parsed decoded source, which the import reports per corner.
+#[derive(Clone, Copy)]
+struct Parsed {
+    nets: usize,
+    nodes: usize,
+    elements: usize,
+    coupling_records: usize,
 }
 
 fn check_corner(corner: &str) -> Result<(), Error> {
@@ -46,8 +57,9 @@ fn check_corner(corner: &str) -> Result<(), Error> {
     Ok(())
 }
 
-/// Reads the raw bytes of one SPEF file, bounded by `limits` (RCLI-REQ-0073).
-fn read_source(path: &Path, limits: Limits) -> Result<Vec<u8>, Error> {
+/// Opens one SPEF file to read it: a regular file, neither followed through a symlink nor
+/// opened blocking (RCLI-REQ-0073).
+fn open_source(path: &Path) -> Result<fs::File, Error> {
     let meta = fs::symlink_metadata(path)
         .map_err(|e| Error::input_rejected(format!("{}: {e}", path.display())))?;
     if !meta.file_type().is_file() {
@@ -72,6 +84,12 @@ fn read_source(path: &Path, limits: Limits) -> Result<Vec<u8>, Error> {
     {
         return Err(Error::input_rejected("SPEF source is not a regular file"));
     }
+    Ok(file)
+}
+
+/// Reads the raw bytes of one SPEF file, bounded by `limits` (RCLI-REQ-0073).
+fn read_source(path: &Path, limits: Limits) -> Result<Vec<u8>, Error> {
+    let file = open_source(path)?;
     let mut bytes = Vec::new();
     file.take(limits.max_bytes as u64 + 1)
         .read_to_end(&mut bytes)
@@ -82,6 +100,38 @@ fn read_source(path: &Path, limits: Limits) -> Result<Vec<u8>, Error> {
         ));
     }
     Ok(bytes)
+}
+
+/// The position in `earlier` of the decoded text that the file at `path` holds byte for byte,
+/// if any (RCLI-REQ-0075). The file is compared while it is read, a chunk at a time, so that a
+/// source given for several corners is never held twice. A file equal to a decoded text is a
+/// plain source whose decoded text is that text: a decoded text is UTF-8, which never starts
+/// with the gzip magic bytes. A difference, a file that cannot be opened or read as
+/// [`read_source`] reads it, or no earlier text give `None`; the file is then read like any
+/// other, which reports its errors.
+fn earlier_copy(path: &Path, earlier: &[(Rc<Vec<u8>>, Parsed)]) -> Option<usize> {
+    if earlier.is_empty() {
+        return None;
+    }
+    let mut file = open_source(path).ok()?;
+    let len = file.metadata().ok()?.len();
+    let mut candidates: Vec<usize> = (0..earlier.len())
+        .filter(|&i| earlier[i].0.len() as u64 == len)
+        .collect();
+    let mut chunk = vec![0u8; 1 << 20];
+    let mut at = 0usize;
+    while !candidates.is_empty() {
+        let n = match file.read(&mut chunk) {
+            Ok(0) => return candidates.into_iter().find(|&i| earlier[i].0.len() == at),
+            Ok(n) => n,
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(_) => return None,
+        };
+        let read = &chunk[..n];
+        candidates.retain(|&i| earlier[i].0.get(at..at + n) == Some(read));
+        at += n;
+    }
+    None
 }
 
 /// The corners of a `parasitics` table of `rev`, read back for carry-forward (RCLI-REQ-0075).
@@ -113,7 +163,7 @@ pub(crate) fn read_corners(rev: &Revision) -> Result<Vec<CornerEntry>, Error> {
                 source_path,
                 source_hash,
             },
-            text: rbin.section_bytes(1)?.to_vec(),
+            text: Rc::new(rbin.section_bytes(1)?.to_vec()),
         }]);
     }
     let metadata = rbin.section_bytes(1)?;
@@ -124,7 +174,7 @@ pub(crate) fn read_corners(rev: &Revision) -> Result<Vec<CornerEntry>, Error> {
         serde_json::from_slice(metadata).map_err(|e| bad(e.to_string()))?;
     let mut out = Vec::with_capacity(set.corners.len());
     for (i, source) in set.corners.into_iter().enumerate() {
-        let text = rbin.section_bytes(i as u32 + 2)?.to_vec();
+        let text = Rc::new(rbin.section_bytes(i as u32 + 2)?.to_vec());
         out.push(CornerEntry { source, text });
     }
     Ok(out)
@@ -199,41 +249,90 @@ pub(crate) fn import_spefs(
 
     let mut per_corner = serde_json::Map::new();
     let mut coupling_records = 0usize;
+    // The decoded sources checked so far in this import and their counts: the parse is a pure
+    // function of the decoded text and `limits`, which all inputs share, so an input whose
+    // decoded text equals an earlier one reuses its counts and its text.
+    let mut parsed_sources: Vec<(Rc<Vec<u8>>, Parsed)> = Vec::new();
     for (path, corner) in inputs {
-        let bytes = read_source(path, limits)?;
-        let mut reject = |e: spef::Error| {
-            diags.push(Diagnostic::from_parts(
-                Severity::Error,
-                DiagCode::of(e.code),
-                Some((path.display().to_string(), e.line.max(1) as u32, 1)),
-                e.message.clone(),
-                None,
-            ));
-            Error::input_rejected(e.to_string())
-        };
-        let decoded = spef::decode_source(&bytes, limits).map_err(&mut reject)?;
-        hold(decoded.text.len())?;
-        let parsed = spef::read(&decoded.text, limits).map_err(&mut reject)?;
+        // A file that holds an earlier decoded text is that text: it is compared while it is
+        // read, and not read into a second copy.
+        let (source_bytes, source_hash, encoding, decoded_bytes, text, parsed) =
+            if let Some(i) = earlier_copy(path, &parsed_sources) {
+                let (text, parsed) = (Rc::clone(&parsed_sources[i].0), parsed_sources[i].1);
+                hold(text.len())?;
+                let (bytes, hash) = (text.len(), Hash64::of(&text));
+                (
+                    bytes,
+                    hash,
+                    spef::SourceEncoding::Plain,
+                    bytes,
+                    text,
+                    parsed,
+                )
+            } else {
+                let bytes = read_source(path, limits)?;
+                let (source_bytes, source_hash) = (bytes.len(), Hash64::of(&bytes));
+                let mut reject = |e: spef::Error| {
+                    diags.push(Diagnostic::from_parts(
+                        Severity::Error,
+                        DiagCode::of(e.code),
+                        Some((path.display().to_string(), e.line.max(1) as u32, 1)),
+                        e.message.clone(),
+                        None,
+                    ));
+                    Error::input_rejected(e.to_string())
+                };
+                let decoded = spef::decode_source_owned(bytes, limits).map_err(&mut reject)?;
+                let (encoding, decoded_bytes) = (decoded.encoding, decoded.text.len());
+                hold(decoded_bytes)?;
+                let earlier = parsed_sources
+                    .iter()
+                    .find(|(text, _)| text.as_slice() == decoded.text.as_bytes());
+                let (text, parsed) = match earlier {
+                    Some((text, parsed)) => (Rc::clone(text), *parsed),
+                    None => {
+                        // The checks of `spef::read`, holding one net at a time.
+                        let counts = spef::count(&decoded.text, limits).map_err(&mut reject)?;
+                        let parsed = Parsed {
+                            nets: counts.nets,
+                            nodes: counts.node_count,
+                            elements: counts.element_count,
+                            coupling_records: counts.coupling_records,
+                        };
+                        let text = Rc::new(decoded.text.into_bytes());
+                        parsed_sources.push((Rc::clone(&text), parsed));
+                        (text, parsed)
+                    }
+                };
+                (
+                    source_bytes,
+                    source_hash,
+                    encoding,
+                    decoded_bytes,
+                    text,
+                    parsed,
+                )
+            };
         coupling_records += parsed.coupling_records;
         per_corner.insert(
             corner.clone(),
             json!({
-                "nets": parsed.nets.len(),
-                "nodes": parsed.node_count,
-                "elements": parsed.element_count,
-                "compression": decoded.encoding.as_str(),
-                "source_bytes": bytes.len(),
-                "decoded_bytes": decoded.text.len(),
+                "nets": parsed.nets,
+                "nodes": parsed.nodes,
+                "elements": parsed.elements,
+                "compression": encoding.as_str(),
+                "source_bytes": source_bytes,
+                "decoded_bytes": decoded_bytes,
             }),
         );
         if inputs.len() == 1 {
-            metrics.insert("spef_nets".into(), json!(parsed.nets.len()));
-            metrics.insert("spef_nodes".into(), json!(parsed.node_count));
-            metrics.insert("spef_elements".into(), json!(parsed.element_count));
+            metrics.insert("spef_nets".into(), json!(parsed.nets));
+            metrics.insert("spef_nodes".into(), json!(parsed.nodes));
+            metrics.insert("spef_elements".into(), json!(parsed.elements));
             metrics.insert("spef_corner".into(), json!(corner));
-            metrics.insert("spef_compression".into(), json!(decoded.encoding.as_str()));
-            metrics.insert("spef_source_bytes".into(), json!(bytes.len()));
-            metrics.insert("spef_decoded_bytes".into(), json!(decoded.text.len()));
+            metrics.insert("spef_compression".into(), json!(encoding.as_str()));
+            metrics.insert("spef_source_bytes".into(), json!(source_bytes));
+            metrics.insert("spef_decoded_bytes".into(), json!(decoded_bytes));
         }
         corners.insert(
             corner.clone(),
@@ -242,12 +341,13 @@ pub(crate) fn import_spefs(
                     corner: corner.clone(),
                     limits,
                     source_path: path.display().to_string(),
-                    source_hash: Hash64::of(&bytes).to_string(),
+                    source_hash: source_hash.to_string(),
                 },
-                text: decoded.text.into_bytes(),
+                text,
             },
         );
     }
+    drop(parsed_sources);
 
     let set = CornerSetMetadata {
         corners: corners.values().map(|c| c.source.clone()).collect(),

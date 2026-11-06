@@ -22,6 +22,16 @@
 //! [`Revision::open_library`](crate::Revision::open_library), never for an arbitrary directory,
 //! because its compiled libraries are mapped (WS-REQ-0037). The cache reads regular files only
 //! and never follows a symbolic link (WS-REQ-0025).
+//!
+//! A [`SharedLibraryCache`] is a directory that several workspaces share, so that a library
+//! compiled for one of them is not compiled again for the next (WS-REQ-0085 to WS-REQ-0087).
+//! It holds a copy of the compiled `.rlib` of each library, named as in a workspace cache, and
+//! a record that the publishing tool writes, which binds the copy by its hash and length
+//! ([`CompiledDigest`]). A workspace adopts a library by writing its own copies of the two files
+//! ([`LibraryCache::put_shared`]): the `.lib` from the bytes the caller read, the `.rlib` from
+//! the shared bytes once they are exactly the recorded ones. No file of a workspace cache is
+//! ever a link of a shared file, so a workspace keeps the guarantee of WS-REQ-0037 whatever
+//! happens to the shared directory.
 
 use std::fs;
 use std::ops::RangeInclusive;
@@ -154,6 +164,57 @@ impl LibraryCache {
         Ok(library)
     }
 
+    /// Stores the library `shared` of a [`SharedLibraryCache`] in this cache instead of
+    /// compiling it (WS-REQ-0086), as [`LibraryCache::put_library`] would store `lib_bytes`:
+    /// nothing is written when both files exist here and the `.rlib` is current. Otherwise the
+    /// shared `.rlib` is read and must be exactly the file that `compiled` describes (its length
+    /// and xxh3-64, as the publishing tool recorded them, [`SharedLibraryCache::publish`]) and a
+    /// valid rbin file of `kind` and `versions` (structure and content hash); only then are the
+    /// missing or stale files written into this cache, each atomically as by `put_library`: the
+    /// `.lib` from `lib_bytes` and the `.rlib` from the verified bytes. These are copies of this
+    /// workspace's own, never links, so no later change of the shared directory reaches them.
+    /// `None` when `lib_bytes` are not the library's, or the shared `.rlib` is missing, of
+    /// another type, cannot be read or fails a check; nothing is then written, and the caller
+    /// compiles the library itself. A library adopted this way is byte for byte the library
+    /// that the publishing tool compiled, so a tool must accept only records of libraries it
+    /// compiled itself (see [`SharedLibraryCache`]).
+    pub fn put_shared(
+        &self,
+        shared: &SharedLibrary,
+        lib_bytes: &[u8],
+        compiled: CompiledDigest,
+        kind: &str,
+        versions: RangeInclusive<u32>,
+    ) -> Result<Option<CachedLibrary>> {
+        check_library_name(&shared.name)?;
+        if Hash64::of(lib_bytes) != shared.hash {
+            return Ok(None);
+        }
+        let library = self.located(&shared.name, shared.hash);
+        let has_lib = is_regular_file(&library.lib_path);
+        let current = is_current_rlib(&library.rlib_path, kind, &versions)?;
+        if has_lib && current {
+            return Ok(Some(library));
+        }
+        // The shared bytes are read once and checked; the very bytes checked are written.
+        let rbin = if current {
+            None
+        } else {
+            match read_shared_rlib(&shared.rlib_path, compiled, kind, &versions) {
+                Some(rbin) => Some(rbin),
+                None => return Ok(None),
+            }
+        };
+        fsutil::create_dir_all(&self.dir())?;
+        if !has_lib {
+            fsutil::write_atomic(&library.lib_path, lib_bytes)?;
+        }
+        if let Some(rbin) = rbin {
+            fsutil::write_atomic(&library.rlib_path, rbin.as_bytes())?;
+        }
+        Ok(Some(library))
+    }
+
     /// Compiles the cached verbatim library again and replaces its `.rlib` atomically, e.g.
     /// after a format version change (WS-REQ-0083). The verbatim copy must still hash to
     /// `hash` (otherwise `CORRUPT_TABLE`), and the compiled bytes must be a valid rbin file of
@@ -259,6 +320,174 @@ impl LibraryCache {
             }
             opened => Ok(opened?),
         }
+    }
+}
+
+/// The shared `.rlib` at `path` when it is exactly the file `compiled` describes and a valid
+/// rbin file of `kind` and `versions`; `None` otherwise. The length is checked before the file
+/// is read, so a large file in its place is not read.
+fn read_shared_rlib(
+    path: &Path,
+    compiled: CompiledDigest,
+    kind: &str,
+    versions: &RangeInclusive<u32>,
+) -> Option<Rbin> {
+    let file = fsutil::open_regular(path).ok()?;
+    if file.metadata().ok()?.len() != compiled.bytes {
+        return None;
+    }
+    let mut bytes = Vec::with_capacity(usize::try_from(compiled.bytes).ok()?);
+    std::io::Read::read_to_end(
+        &mut std::io::Read::take(file, compiled.bytes + 1),
+        &mut bytes,
+    )
+    .ok()?;
+    if bytes.len() as u64 != compiled.bytes || Hash64::of(&bytes) != compiled.hash {
+        return None;
+    }
+    let rbin = Rbin::from_bytes(bytes, kind, versions.clone()).ok()?;
+    rbin.verify_hash().ok()?;
+    Some(rbin)
+}
+
+/// The largest record of a [`SharedLibraryCache`] that is read.
+pub const MAX_SHARED_RECORD_BYTES: u64 = 16 << 20;
+
+/// A directory of compiled libraries shared by the caches of several workspaces (WS-REQ-0085),
+/// such as all the workspaces of one flow run (`rusteda import --lib-cache DIR`).
+///
+/// Library `name` with the xxh3-64 `h16` of its bytes is kept as `<name>-<h16>.rlib`, a copy of
+/// its compiled form, and `<name>-<h16>.json`, a record of the tool that published it. The
+/// directory never compiles anything: a tool publishes a library it compiled into a workspace
+/// ([`SharedLibraryCache::publish`]), which puts the length and xxh3-64 of the `.rlib` it copies
+/// ([`CompiledDigest`]) into the record, and a later import finds it by the hash of its bytes
+/// ([`SharedLibraryCache::find`]) and adopts it into another workspace
+/// ([`LibraryCache::put_shared`]), which writes the workspace's own copies once the shared
+/// `.rlib` is exactly the recorded one. What else the record holds is the tool's business; it
+/// must let the tool accept only libraries that it compiled itself, from the same bytes (for
+/// `rusteda import`, the hash of its own executable, the bytes and their source,
+/// RCLI-REQ-0025). Every file is written under a temporary name and renamed, so concurrent
+/// imports are harmless: an `.rlib` replaced by another publisher, or changed in any other way,
+/// no longer matches the record it is found with and is not adopted. The binding guards
+/// against mixed, stale and damaged entries; like any cache, the directory must be writable
+/// only by the tools that publish to it.
+#[derive(Debug, Clone)]
+pub struct SharedLibraryCache {
+    dir: PathBuf,
+}
+
+/// The length and xxh3-64 of the compiled `.rlib` of a library published to a
+/// [`SharedLibraryCache`], which the publishing tool records ([`SharedLibraryCache::publish`])
+/// and gives back when it adopts the library ([`LibraryCache::put_shared`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CompiledDigest {
+    /// The xxh3-64 of the `.rlib` file.
+    pub hash: Hash64,
+    /// Its length in bytes.
+    pub bytes: u64,
+}
+
+/// A library of a [`SharedLibraryCache`], found by the hash of its bytes (WS-REQ-0085).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SharedLibrary {
+    /// The library name.
+    pub name: String,
+    /// The hash of the library bytes.
+    pub hash: Hash64,
+    /// The record stored with the library.
+    pub record: Vec<u8>,
+    /// The compiled library, `<dir>/<name>-<h16>.rlib`.
+    pub rlib_path: PathBuf,
+}
+
+impl SharedLibraryCache {
+    /// The shared cache in `dir`, which is created when a library is published.
+    pub fn new(dir: impl Into<PathBuf>) -> SharedLibraryCache {
+        SharedLibraryCache { dir: dir.into() }
+    }
+
+    /// The directory.
+    pub fn dir(&self) -> &Path {
+        &self.dir
+    }
+
+    fn paths(&self, name: &str, hash: Hash64) -> (PathBuf, PathBuf) {
+        let stem = format!("{name}-{}", hash.hex());
+        (
+            self.dir.join(format!("{stem}.rlib")),
+            self.dir.join(format!("{stem}.json")),
+        )
+    }
+
+    /// Every library stored with `hash`, whatever its name, sorted by name, with its record:
+    /// those whose `.rlib` and record exist as regular files (a symbolic link is not followed,
+    /// WS-REQ-0025) and whose record is at most [`MAX_SHARED_RECORD_BYTES`]. Nothing else is
+    /// checked here; [`LibraryCache::put_shared`] verifies the `.rlib` it adopts. A missing
+    /// directory has no libraries.
+    pub fn find(&self, hash: Hash64) -> Result<Vec<SharedLibrary>> {
+        let suffix = format!("-{}.json", hash.hex());
+        let entries = match fs::read_dir(&self.dir) {
+            Ok(entries) => entries,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(e) => return Err(Error::io(&self.dir, e)),
+        };
+        let mut found = Vec::new();
+        for entry in entries {
+            let entry = entry.map_err(|e| Error::io(&self.dir, e))?;
+            let Ok(file) = entry.file_name().into_string() else {
+                continue;
+            };
+            let Some(name) = file.strip_suffix(&suffix) else {
+                continue;
+            };
+            if !is_library_name(name) {
+                continue;
+            }
+            let (rlib_path, record_path) = self.paths(name, hash);
+            let record_size = fs::symlink_metadata(&record_path)
+                .ok()
+                .filter(|m| m.file_type().is_file())
+                .map(|m| m.len());
+            if !is_regular_file(&rlib_path)
+                || !record_size.is_some_and(|n| n <= MAX_SHARED_RECORD_BYTES)
+            {
+                continue;
+            }
+            let Ok(record) = fsutil::read_regular(&record_path) else {
+                continue;
+            };
+            found.push(SharedLibrary {
+                name: name.to_string(),
+                hash,
+                record,
+                rlib_path,
+            });
+        }
+        found.sort_by(|a, b| a.name.cmp(&b.name));
+        Ok(found)
+    }
+
+    /// Publishes the library `cached` of a workspace cache (WS-REQ-0087): its `.rlib` is read
+    /// once and copied into the directory, and `record`, given the [`CompiledDigest`] of the
+    /// bytes copied, makes the record that is written after it. Each file is written under a
+    /// temporary name, fsynced and renamed (the directory is created when missing), so an
+    /// entry of the same name and hash is replaced, and the workspace's file stays a file of
+    /// its own. The caller has just stored or verified `cached` in its workspace.
+    pub fn publish(
+        &self,
+        cached: &CachedLibrary,
+        record: impl FnOnce(CompiledDigest) -> Vec<u8>,
+    ) -> Result<()> {
+        check_library_name(&cached.name)?;
+        let compiled = fsutil::read_regular(&cached.rlib_path)?;
+        let digest = CompiledDigest {
+            hash: Hash64::of(&compiled),
+            bytes: compiled.len() as u64,
+        };
+        fsutil::create_dir_all(&self.dir)?;
+        let (rlib_path, record_path) = self.paths(&cached.name, cached.hash);
+        fsutil::write_atomic(&rlib_path, &compiled)?;
+        fsutil::write_atomic(&record_path, &record(digest))
     }
 }
 

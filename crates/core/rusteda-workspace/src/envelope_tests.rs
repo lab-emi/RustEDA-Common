@@ -520,3 +520,53 @@ fn ordered_objects_nested_in_structs() {
         r#"{"b":1.5,"a":-0.0,"n":-3}"#
     );
 }
+
+// WS-REQ-0091: an array spliced from objects is the text that serializing the objects gives
+// when their numbers were serialized from their values, at every level of nesting, and an
+// empty array is `[]`.
+#[test]
+fn array_splices_like_serializing_the_objects() {
+    let leaf = |i: u32| {
+        let mut o = JsonObject::new();
+        o.insert("pin", &format!("r{i}/D \"q\" \\ é")).unwrap();
+        o.insert("slack_ns", &(f64::from(i) * -0.125 + 1e-300))
+            .unwrap();
+        o.insert("count", &i).unwrap();
+        o.insert("net", &Option::<String>::None).unwrap();
+        o.insert("tags", &["a", "b"]).unwrap();
+        o
+    };
+    let mut rows = Vec::new();
+    for i in 0..5 {
+        let mut row = leaf(i);
+        let stages: Vec<JsonObject> = (0..i).map(leaf).collect();
+        let mut path = JsonObject::new();
+        path.insert("handle", &format!("path{i}")).unwrap();
+        path.insert_raw("stages", RawJson::array(stages.clone()));
+        row.insert_raw("path", path.clone().into());
+        let mut serialized = leaf(i);
+        let mut path2 = JsonObject::new();
+        path2.insert("handle", &format!("path{i}")).unwrap();
+        path2.insert("stages", &stages).unwrap();
+        serialized.insert("path", &path2).unwrap();
+        assert_eq!(row.to_raw(), RawJson::new(&serialized).unwrap());
+        rows.push(row);
+    }
+    let spliced = RawJson::array(rows.iter());
+    assert_eq!(spliced, RawJson::new(&rows).unwrap());
+    json::validate(spliced.as_str()).unwrap();
+    assert_eq!(RawJson::array(Vec::<JsonObject>::new()).as_str(), "[]");
+    let mut e = Envelope::new("ruststa report");
+    let mut sections = JsonObject::new();
+    sections.insert_raw("rows", spliced);
+    e.set_raw("sections", sections.to_raw()).unwrap();
+    let mut e2 = Envelope::new("ruststa report");
+    let mut sections2 = JsonObject::new();
+    sections2.insert("rows", &rows).unwrap();
+    e2.set("sections", &sections2).unwrap();
+    assert_eq!(e.to_json(JsonStyle::Pretty), e2.to_json(JsonStyle::Pretty));
+    assert_eq!(
+        e.to_json(JsonStyle::Compact),
+        e2.to_json(JsonStyle::Compact)
+    );
+}

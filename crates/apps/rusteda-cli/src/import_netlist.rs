@@ -453,3 +453,81 @@ pub(crate) fn import_netlist(
     metrics.insert("assigns".to_string(), json!(n_assigns));
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn cell(pins: &[(&str, PinDir)]) -> CellInfo {
+        CellInfo {
+            pins: pins.iter().map(|(n, d)| (n.to_string(), *d)).collect(),
+            pin_index: pins
+                .iter()
+                .enumerate()
+                .map(|(i, (n, _))| (n.to_string(), i as u32))
+                .collect(),
+            pg_pins: HashSet::new(),
+            first_corner: "tt".to_string(),
+            conflicts: Vec::new(),
+        }
+    }
+
+    /// A buffer and a macro whose buses are bit pins `NAME[i]`, one descending, one ascending.
+    fn catalog() -> CellCatalog {
+        use PinDir::{Input, Output};
+        let mut cat = CellCatalog::default();
+        cat.cells
+            .insert("BUF".into(), cell(&[("A", Input), ("Y", Output)]));
+        cat.cells.insert(
+            "RAM".into(),
+            cell(&[
+                ("CLK", Input),
+                ("ADDR[3]", Input),
+                ("ADDR[2]", Input),
+                ("ADDR[1]", Input),
+                ("ADDR[0]", Input),
+                ("DIN[0]", Input),
+                ("DIN[1]", Input),
+                ("DOUT[1]", Output),
+                ("DOUT[0]", Output),
+                ("BIST[0]", Input),
+                ("BIST[1]", Input),
+            ]),
+        );
+        cat
+    }
+
+    // RCLI-REQ-0019: the streaming reader connects the bit pins of a bus as the netlist reader
+    // does (concatenations, part- and bit-selects, constants, escaped names, an empty
+    // connection), so a netlist with bus pins is read by it, to the same frozen netlist.
+    #[test]
+    fn streaming_reader_connects_bus_pins_as_the_netlist_reader() {
+        let text = r"module top (input clk, input [3:0] a, input \x.y , output [1:0] q);
+  wire [1:0] d;
+  wire n0;
+  BUF b0 (.A(a[0]), .Y(n0));
+  RAM \mem.0 (.CLK(clk), .ADDR({a[3:2], n0, \x.y }), .DIN({1'b0, d[1]}), .DOUT(q), .BIST());
+  RAM m1 (.ADDR(a), .DOUT({d[0], d[1]}), .DIN(2'b10), .CLK(clk));
+  assign d[0] = q[1];
+endmodule
+";
+        let catalog = catalog();
+        let fast =
+            fast::try_fast_flat(text, &catalog).expect("the streaming reader takes bus pins");
+        let ast = read_netlist_ast(text, "top.v", &catalog, &mut Vec::new()).unwrap();
+        assert_eq!(fast, ast.freeze());
+        fast.validate().unwrap();
+
+        // What the netlist reader rejects, the streaming reader leaves to it: a width that
+        // differs from the bus, a bus given twice, a pin it does not have.
+        for conn in [
+            ".ADDR({a[1:0], n0})",
+            ".ADDR(a), .ADDR(a)",
+            ".ADDR[0](n0)",
+            ".NOPE(n0)",
+        ] {
+            let bad = format!("module top (input [3:0] a, input n0); RAM m ({conn}); endmodule\n");
+            assert!(fast::try_fast_flat(&bad, &catalog).is_none(), "{conn}");
+        }
+    }
+}
