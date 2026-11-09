@@ -5,15 +5,30 @@ edition = "2024"
 rust-version = "1.97"
 license = "Apache-2.0"
 publish = false
+autobins = false
+autotests = false
 
 [[bin]]
-name = "rusteda-rc-crossing-g1-session"
-path = "src/bin/session.rs"
+name = "rusteda-rc-crossing-g1-session-v3"
+path = "src/bin/session_v3.rs"
+
+[[test]]
+name = "cpu"
+path = "tests/cpu.rs"
+
+[[test]]
+name = "session_cpu"
+path = "tests/session_cpu.rs"
+
+[[test]]
+name = "v3_transport"
+path = "tests/v3_transport.rs"
 
 # Isolated component; production Common workspace/dispatch stay unchanged.
 [workspace]
 
 [dependencies]
+rusteda-compute = { path = "../../crates/core/rusteda-compute", default-features = false }
 rayon = "=1.12.0"
 memmap2 = "=0.9.11"
 sha2 = "=0.10.9"

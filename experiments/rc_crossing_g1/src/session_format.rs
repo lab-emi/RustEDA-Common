@@ -5,7 +5,6 @@ use crate::{Error, Grid, Query, Record, Result, Table, View, admit};
 
 pub const HEADER_BYTES: usize = 4096;
 pub const ACTIVATION_HEADER_BYTES: usize = 256;
-const WIDTHS: [usize; 5] = [4, 4, 96, 4, 48];
 fn bytes(raw: &[u8], at: usize, n: usize) -> Result<&[u8]> {
     raw.get(at..at.checked_add(n).ok_or(Error::Budget("frame offset"))?)
         .ok_or(Error::Invalid("frame extent"))
@@ -51,36 +50,8 @@ fn zero(raw: &[u8]) -> Result<()> {
     }
     Ok(())
 }
-fn align(n: usize) -> Result<usize> {
-    n.checked_add(63)
-        .map(|n| n & !63)
-        .ok_or(Error::Budget("static alignment"))
-}
-fn layout(counts: [usize; 5]) -> Result<([(usize, usize); 5], usize)> {
-    let mut at = HEADER_BYTES;
-    let mut ranges = [(0, 0); 5];
-    for i in 0..5 {
-        let start = align(at)?;
-        at = counts[i]
-            .checked_mul(WIDTHS[i])
-            .and_then(|n| start.checked_add(n))
-            .ok_or(Error::Budget("static section bytes"))?;
-        ranges[i] = (start, at);
-    }
-    Ok((ranges, at))
-}
-
-/// Exact five-section byte length; semantic validation is a separate step.
-pub fn canonical_static_bytes(view: View<'_>) -> Result<u64> {
-    let counts = [
-        view.offsets.len(),
-        view.entries.len(),
-        view.instances.len(),
-        view.template_offsets.len(),
-        view.rectangles.len(),
-    ];
-    u64::try_from(layout(counts)?.1).map_err(|_| Error::Budget("static length"))
-}
+pub use rusteda_compute::geometry::crossings::device_abi::canonical_static_bytes;
+use rusteda_compute::geometry::crossings::device_abi::layout;
 
 #[derive(Clone, Copy, Debug)]
 pub struct DecodedStatic<'view> {
@@ -348,8 +319,8 @@ impl ActivationHeader {
             return Err(Error::Invalid("activation header bounds"));
         }
         let mut raw = [0u8; ACTIVATION_HEADER_BYTES];
-        put(&mut raw, 0, b"RG1ACT02")?;
-        put(&mut raw, 8, &2u32.to_le_bytes())?;
+        put(&mut raw, 0, b"RG1ACT03")?;
+        put(&mut raw, 8, &3u32.to_le_bytes())?;
         put(
             &mut raw,
             12,
@@ -367,7 +338,7 @@ impl ActivationHeader {
         put(&mut raw, 48, &self.static_sha)?;
         put(&mut raw, 80, &self.tape_sha)?;
         put(&mut raw, 112, &self.protocol_sha)?;
-        put(&mut raw, 144, &2u32.to_le_bytes())?;
+        put(&mut raw, 144, &0u32.to_le_bytes())?;
         put(&mut raw, 148, &self.workers.to_le_bytes())?;
         Ok(raw)
     }
