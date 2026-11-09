@@ -6,6 +6,8 @@
 //! capacitances pF, resistances kOhm.
 use crate::ComputeError;
 
+pub mod charge;
+
 /// Progress-normalized trip points: falling voltages are mapped through 1-v.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Thresholds {
@@ -118,6 +120,50 @@ fn fit_duration(slew: f64, cap: f64, res: f64, t: Thresholds) -> Result<f64, Com
     }
     Err(ComputeError::Invalid(
         "RC source-duration fit did not converge".into(),
+    ))
+}
+
+/// Fit the nominal lower/upper crossing interval to the characterized table transition.
+/// The separately declared legacy models retain their lower/delay fit.
+fn fit_full_duration(slew: f64, cap: f64, res: f64, t: Thresholds) -> Result<f64, ComputeError> {
+    let target = slew * t.derate;
+    let tau = res * cap;
+    if tau == 0.0 {
+        return Ok(target / (t.upper - t.lower));
+    }
+    let minimum = tau * ((1.0 - t.lower) / (1.0 - t.upper)).ln();
+    if target <= minimum {
+        return Err(ComputeError::Invalid(
+            "NLDM transition incompatible with full-interval Thevenin resistance".into(),
+        ));
+    }
+    let mut lo = 0.0;
+    let mut hi = target / (t.upper - t.lower) + 2.0 * tau;
+    let mut x = (target / (t.upper - t.lower)).min(hi);
+    let tolerance = (hi * 1e-12).max(1e-15);
+    for _ in 0..56 {
+        let upper = crossing(x, tau, t.upper);
+        let lower = crossing(x, tau, t.lower);
+        let residual = upper - lower - target;
+        if residual.abs() <= tolerance {
+            return Ok(x);
+        }
+        if residual < 0.0 {
+            lo = x;
+        } else {
+            hi = x;
+        }
+        let slope =
+            crossing_gradient(x, tau, t.upper, upper) - crossing_gradient(x, tau, t.lower, lower);
+        let next = x - residual / slope;
+        x = if next > lo && next < hi {
+            next
+        } else {
+            lo + (hi - lo) * 0.5
+        };
+    }
+    Err(ComputeError::Invalid(
+        "RC full-interval source-duration fit did not converge".into(),
     ))
 }
 
@@ -708,6 +754,61 @@ mod tests {
             derate: 1.0,
         }
     }
+    // Fixed scalar storage: 12 independent full-slew fits, each bounded by 56 iterations.
+    // Independent external Ngspice controls verify the same physical crossing invariant.
+    #[test]
+    fn full_interval_fit_recovers_characterized_slew() {
+        for (lower, upper, output, derate) in [
+            (0.2, 0.8, 0.5, 1.0),
+            (0.3, 0.7, 0.5, 0.5),
+            (0.15, 0.85, 0.4, 1.0),
+        ] {
+            let t = Thresholds {
+                lower,
+                upper,
+                output,
+                derate,
+                input: 0.5,
+            };
+            for tau in [0.0, 0.02, 0.7, 2.0] {
+                let slew = (2.4 * tau + 0.3) / derate;
+                let duration = fit_full_duration(slew, 0.02, tau / 0.02, t).unwrap();
+                let nominal =
+                    (crossing(duration, tau, upper) - crossing(duration, tau, lower)) / derate;
+                assert!(
+                    (nominal - slew).abs() < 1e-10,
+                    "{t:?}: {tau} {nominal} {slew}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn full_interval_fit_keeps_step_boundary_explicit_and_zero_resistance_linear() {
+        let t = trips();
+        let slew = 0.5 * ((1.0 - t.lower) / (1.0 - t.upper)).ln();
+        assert!(fit_full_duration(slew, 0.125, 4.0, t).is_err());
+        assert!(fit_full_duration(slew * (1.0 - 1e-4), 0.125, 4.0, t).is_err());
+        let above = fit_full_duration(slew * (1.0 + 1e-4), 0.125, 4.0, t).unwrap();
+        let span = crossing(above, 0.5, t.upper) - crossing(above, 0.5, t.lower);
+        assert!((span - slew * (1.0 + 1e-4)).abs() < 1e-10);
+        let duration = 0.0;
+        assert!(
+            (crossing(duration, 0.5, t.upper) - crossing(duration, 0.5, t.lower) - slew).abs()
+                < 1e-14
+        );
+        let duration = fit_full_duration(0.3, 0.1, 0.0, t).unwrap();
+        assert!((duration - 0.5).abs() < 1e-14);
+    }
+
+    #[test]
+    fn full_interval_fit_rejects_incompatible_nominal_slew() {
+        let t = trips();
+        let minimum = 0.7 * ((1.0 - t.lower) / (1.0 - t.upper)).ln();
+        let err = fit_full_duration(0.99 * minimum, 0.1, 7.0, t).unwrap_err();
+        assert!(matches!(err, ComputeError::Invalid(_)), "{err}");
+    }
+
     // STA-REQ-0721: fixed resource bounds, zero resistance and invalid models.
     #[test]
     fn limits_and_degenerate_models() {

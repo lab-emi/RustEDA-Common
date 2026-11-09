@@ -80,6 +80,11 @@ pub(super) fn is_supported_in_bus_or_bundle(ctx: Ctx, g: &Group) -> Result<(), S
         }
     }
     for c in &g.groups {
+        // Opaque memory behavior does not prevent importing the pin's NLDM
+        // interface. `Classifier::group` still diagnoses these declarations.
+        if matches!(c.kind.as_str(), "memory_read" | "memory_write") {
+            continue;
+        }
         match group_class(ctx, &c.kind) {
             GroupClass::Consumed(_) | GroupClass::Ignorable => {}
             GroupClass::Unsupported => {
@@ -589,6 +594,12 @@ impl Classifier {
         seen.clear();
         for c in &g.groups {
             let at = (c.line, c.col);
+            if matches!(c.kind.as_str(), "memory" | "memory_read" | "memory_write") {
+                self.warn(diags, code::OPAQUE_MEMORY, path, &c.kind, at, || {
+                    format!("{} describes opaque memory behavior; pins and timing arcs are retained, memory contents are not lowered to Boolean logic", c.kind)
+                });
+                continue;
+            }
             match group_class(ctx, &c.kind) {
                 GroupClass::Consumed(single) => {
                     if single && seen.contains(&c.kind.as_str()) {

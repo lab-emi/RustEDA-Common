@@ -11,7 +11,7 @@
 
 use rayon::prelude::*;
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::io::{self, Write};
 
 use rusteda_core::names::unescape;
@@ -97,6 +97,17 @@ pub(super) struct Plan<'f, 'a> {
     port_names: Vec<bool>,
     normal_ranges: bool,
     parallel: bool,
+    aux_bytes: u128,
+    max_aux_bytes: u128,
+    cell_buses: HashMap<u32, Vec<CellPort>>,
+}
+
+/// Explicit interface metadata; a bracket in a scalar identifier is never guessed to be a bus.
+pub(super) type CellBusSchemas = BTreeMap<String, BTreeMap<String, [i32; 2]>>;
+
+enum CellPort {
+    Scalar(usize),
+    Bus { name: String, pins: Vec<usize> },
 }
 
 fn identifier(out: &mut impl Write, name: &str) -> io::Result<()> {
@@ -275,7 +286,109 @@ impl<'f, 'a> Plan<'f, 'a> {
             port_names,
             normal_ranges,
             parallel: aux + 32 * 1024 * 1024 <= limits.max_aux_bytes as u128,
+            aux_bytes: aux,
+            max_aux_bytes: limits.max_aux_bytes as u128,
+            cell_buses: HashMap::new(),
         })
+    }
+
+    /// At most 256 cells, 65536 covered pins and 8 MiB of generated pin names.
+    /// Builds one table per cell, not per instance; no graph traversal is needed.
+    pub fn set_cell_buses(&mut self, schemas: &CellBusSchemas) -> Result<(), Error> {
+        const MAX_PINS: usize = 65536;
+        // Includes input JSON, transient name/owner maps, port plans, and the
+        // 16 maximum parallel chunks' per-instance net scratch. Count scalar
+        // pins too: a cell with one bus may have many scalar ports.
+        const SCHEMA_AUX_BYTES: u128 = 64 * 1024 * 1024;
+        if schemas.len() > 256 {
+            return Err(input("CELL_BUS_SCHEMA: more than 256 cells"));
+        }
+        if self.aux_bytes + SCHEMA_AUX_BYTES > self.max_aux_bytes {
+            return Err(input("CELL_BUS_SCHEMA: auxiliary memory budget exceeded"));
+        }
+        let mut covered = 0usize;
+        let mut expanded = 0usize;
+        let mut name_bytes = 0usize;
+        let mut plans = HashMap::new();
+        for (cell_name, buses) in schemas {
+            let cell = self
+                .f
+                .cells
+                .iter()
+                .position(|&s| string(self.f, s) == cell_name)
+                .ok_or_else(|| input(format!("CELL_BUS_SCHEMA: cell {cell_name} is absent")))?;
+            let start = self.f.cell_pin_start[cell] as usize;
+            let end = self.f.cell_pin_start[cell + 1] as usize;
+            covered = covered
+                .checked_add(end - start)
+                .ok_or_else(|| input("CELL_BUS_SCHEMA: covered pin budget overflow"))?;
+            if covered > MAX_PINS || buses.len() > 4096 {
+                return Err(input("CELL_BUS_SCHEMA: cell pin/bus budget exceeded"));
+            }
+            let names: HashMap<_, _> = (start..end)
+                .map(|p| (string(self.f, self.f.cell_pin_name[p]), p - start))
+                .collect();
+            let mut owner = vec![None; end - start];
+            let mut groups = Vec::new();
+            for (name, &[msb, lsb]) in buses {
+                if name.is_empty() || name.len() > 4096 || names.contains_key(name.as_str()) {
+                    return Err(input(format!(
+                        "CELL_BUS_SCHEMA: invalid or conflicting port {name}"
+                    )));
+                }
+                let width = (i64::from(msb) - i64::from(lsb)).unsigned_abs() + 1;
+                let width =
+                    usize::try_from(width).map_err(|_| input("CELL_BUS_SCHEMA: range overflow"))?;
+                expanded = expanded
+                    .checked_add(width)
+                    .ok_or_else(|| input("CELL_BUS_SCHEMA: range overflow"))?;
+                name_bytes = name_bytes
+                    .checked_add(width.saturating_mul(name.len() + 16))
+                    .ok_or_else(|| input("CELL_BUS_SCHEMA: name budget overflow"))?;
+                if expanded > MAX_PINS || name_bytes > 8 * 1024 * 1024 {
+                    return Err(input("CELL_BUS_SCHEMA: expanded pin/name budget exceeded"));
+                }
+                let mut pins = Vec::with_capacity(width);
+                let mut direction = None;
+                let step = if msb <= lsb { 1i64 } else { -1 };
+                for k in 0..width {
+                    let bit = i64::from(msb) + step * k as i64;
+                    let key = format!("{name}[{bit}]");
+                    let &pin = names.get(key.as_str()).ok_or_else(|| {
+                        input(format!("CELL_BUS_SCHEMA: missing {cell_name}.{key}"))
+                    })?;
+                    let dir = self.f.cell_pin_dir[start + pin];
+                    if dir > 2 || direction.is_some_and(|previous| previous != dir) {
+                        return Err(input(format!(
+                            "CELL_BUS_SCHEMA: mixed or unsupported direction in {cell_name}.{name}"
+                        )));
+                    }
+                    direction = Some(dir);
+                    if owner[pin].replace(groups.len()).is_some() {
+                        return Err(input("CELL_BUS_SCHEMA: overlapping bus members"));
+                    }
+                    pins.push(pin);
+                }
+                groups.push(Some(CellPort::Bus {
+                    name: ident(name),
+                    pins,
+                }));
+            }
+            let mut ports = Vec::with_capacity(end - start);
+            for (pin, group) in owner.into_iter().enumerate() {
+                if let Some(group) = group {
+                    if let Some(port) = groups[group].take() {
+                        ports.push(port);
+                    }
+                } else {
+                    ports.push(CellPort::Scalar(pin));
+                }
+            }
+            plans.insert(cell as u32, ports);
+        }
+        self.cell_buses = plans;
+        self.parallel = self.aux_bytes + SCHEMA_AUX_BYTES + 32 * 1024 * 1024 <= self.max_aux_bytes;
+        Ok(())
     }
 
     fn reference(&self, out: &mut impl Write, conn: u32) -> io::Result<()> {
@@ -307,6 +420,49 @@ impl<'f, 'a> Plan<'f, 'a> {
         identifier(out, &raw(string(f, instance.name)))?;
         out.write_all(b" (")?;
         let range = f.instance_pins(id as u32);
+        if let Some(ports) = self.cell_buses.get(&instance.cell) {
+            let pin_count = f.cell_pin_start[instance.cell as usize + 1] as usize - pin_start;
+            let mut nets = vec![None; pin_count];
+            for at in range {
+                nets[f.pin_cellpin[at] as usize] = Some(f.pin_net[at]);
+            }
+            let mut first = true;
+            for port in ports {
+                match port {
+                    CellPort::Scalar(pin) => {
+                        let Some(net) = nets[*pin] else { continue };
+                        if !first {
+                            out.write_all(b", ")?;
+                        }
+                        first = false;
+                        write!(out, ".{}(", pins[pin_start + pin])?;
+                        self.reference(out, net)?;
+                        out.write_all(b")")?;
+                    }
+                    CellPort::Bus {
+                        name,
+                        pins: members,
+                    } => {
+                        if !first {
+                            out.write_all(b", ")?;
+                        }
+                        first = false;
+                        write!(out, ".{name}({{")?;
+                        for (at, &pin) in members.iter().enumerate() {
+                            if at != 0 {
+                                out.write_all(b", ")?;
+                            }
+                            let net = nets[pin].ok_or_else(|| {
+                                io::Error::other("CELL_BUS_SCHEMA: unconnected bus member")
+                            })?;
+                            self.reference(out, net)?;
+                        }
+                        out.write_all(b"})")?;
+                    }
+                }
+            }
+            return out.write_all(b");\n");
+        }
         for at in range.clone() {
             if at != range.start {
                 out.write_all(b", ")?;
@@ -413,6 +569,84 @@ impl<'f, 'a> Plan<'f, 'a> {
 mod tests {
     use super::*;
     use rusteda_core::netlist::{Conn, GateNetlist, PinDir, PortDir};
+
+    #[test]
+    fn explicit_cell_bus_schema_preserves_direction_and_scalar_identifiers() {
+        let mut g = GateNetlist::new("top").unwrap();
+        let cell = g
+            .add_cell_type(
+                "memory",
+                &[
+                    ("A[4]", PinDir::Input),
+                    ("A[3]", PinDir::Input),
+                    ("Q[3]", PinDir::Output),
+                    ("Q[4]", PinDir::Output),
+                ],
+            )
+            .unwrap();
+        let u = g.add_instance("u", cell).unwrap();
+        for (pin, value) in [("A[4]", true), ("A[3]", false)] {
+            g.connect(u, pin, Conn::Const(value)).unwrap();
+        }
+        g.add_port("y", PortDir::Output, Some((1, 0))).unwrap();
+        g.connect(u, "Q[3]", Conn::Net(g.find_net("y", Some(0)).unwrap()))
+            .unwrap();
+        g.connect(u, "Q[4]", Conn::Net(g.find_net("y", Some(1)).unwrap()))
+            .unwrap();
+        let f = g.freeze();
+        f.validate().unwrap();
+        let mut plan = Plan::new(&f, Limits::default()).unwrap();
+        let mut raw = Vec::new();
+        plan.write(&mut raw).unwrap();
+        assert!(String::from_utf8(raw).unwrap().contains(".\\A[4] (1'b1)"));
+        let schema = BTreeMap::from([(
+            "memory".into(),
+            BTreeMap::from([("A".into(), [4, 3]), ("Q".into(), [3, 4])]),
+        )]);
+        plan.set_cell_buses(&schema).unwrap();
+        let mut out = Vec::new();
+        plan.write(&mut out).unwrap();
+        let out = String::from_utf8(out).unwrap();
+        assert!(out.contains(".A({1'b1, 1'b0})"));
+        assert!(out.contains(".Q({y[0], y[1]})"));
+        let invalid = BTreeMap::from([(
+            "memory".into(),
+            BTreeMap::from([("A".into(), [i32::MIN, i32::MAX])]),
+        )]);
+        assert!(plan.set_cell_buses(&invalid).is_err());
+        let missing = BTreeMap::from([("memory".into(), BTreeMap::from([("A".into(), [5, 3])]))]);
+        assert!(plan.set_cell_buses(&missing).is_err());
+        let mut limited = Plan::new(
+            &f,
+            Limits {
+                max_aux_bytes: 64 * 1024 * 1024,
+                ..Limits::default()
+            },
+        )
+        .unwrap();
+        assert!(limited.set_cell_buses(&schema).is_err());
+    }
+
+    #[test]
+    fn cell_bus_schema_rejects_mixed_pin_directions() {
+        let mut g = GateNetlist::new("top").unwrap();
+        let cell = g
+            .add_cell_type(
+                "mixed",
+                &[("B[0]", PinDir::Input), ("B[1]", PinDir::Output)],
+            )
+            .unwrap();
+        let u = g.add_instance("u", cell).unwrap();
+        g.connect(u, "B[0]", Conn::Const(true)).unwrap();
+        g.add_port("y", PortDir::Output, None).unwrap();
+        g.connect(u, "B[1]", Conn::Net(g.find_net("y", None).unwrap()))
+            .unwrap();
+        let f = g.freeze();
+        f.validate().unwrap();
+        let mut plan = Plan::new(&f, Limits::default()).unwrap();
+        let schema = BTreeMap::from([("mixed".into(), BTreeMap::from([("B".into(), [1, 0])]))]);
+        assert!(plan.set_cell_buses(&schema).is_err());
+    }
 
     //2048 cells, O(V+E) storage <16MiB plus <=32MiB temporary text; no path traversal.
     #[test]

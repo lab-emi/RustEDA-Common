@@ -618,6 +618,53 @@ pub(super) fn build_cmd_kind(
                 objects,
             })
         }
+        "set_timing_derate" => {
+            if p.pos.len() != 1
+                || [
+                    "-rise",
+                    "-fall",
+                    "-clock",
+                    "-data",
+                    "-net_delay",
+                    "-cell_delay",
+                    "-cell_check",
+                    "-static",
+                    "-dynamic",
+                    "-increment",
+                ]
+                .iter()
+                .any(|flag| p.has_flag(flag))
+            {
+                return Err(("D0010", "set_timing_derate supports global early/late cell and net delay factors; object, transition, path, check and incremental scopes are unsupported".into()));
+            }
+            if p.has_flag("-early") == p.has_flag("-late") {
+                return Err((
+                    "D0004",
+                    "set_timing_derate requires exactly one of -early and -late".into(),
+                ));
+            }
+            let factor = parse_f64_val(&p.pos[0], name, "derate_value")?;
+            if !factor.is_finite() || factor <= 0.0 {
+                return Err((
+                    "D0005",
+                    "set_timing_derate expects a finite positive factor".into(),
+                ));
+            }
+            Ok(CmdKind::SetTimingDerate {
+                factor,
+                early_late: p.early_late_scope(),
+                edge: p.edge_scope(),
+                clock: false,
+                data: false,
+                net_delay: false,
+                cell_delay: false,
+                cell_check: false,
+                static_derate: false,
+                dynamic: false,
+                increment: false,
+                objects: None,
+            })
+        }
         "group_path" => {
             let grp_name = p.get_str("-name");
             let default = p.has_flag("-default");

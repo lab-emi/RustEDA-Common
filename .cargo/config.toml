@@ -1,0 +1,8 @@
+
+# Private F1 dependency binding; also inherited by cargo-clippy child invocations.
+[patch."https://github.com/lab-emi/RustEDA-Common.git"]
+rusteda-core = { path = "/home/cgao/git/RustEDA/.work/ibex-sg13g2-repair/sta-agent/full-slew-f1-source01/Common/crates/core/rusteda-core" }
+rusteda-workspace = { path = "/home/cgao/git/RustEDA/.work/ibex-sg13g2-repair/sta-agent/full-slew-f1-source01/Common/crates/core/rusteda-workspace" }
+rusteda-compute = { path = "/home/cgao/git/RustEDA/.work/ibex-sg13g2-repair/sta-agent/full-slew-f1-source01/Common/crates/core/rusteda-compute" }
+rusteda-formats = { path = "/home/cgao/git/RustEDA/.work/ibex-sg13g2-repair/sta-agent/full-slew-f1-source01/Common/crates/formats/rusteda-formats" }
+rusteda-cli-common = { path = "/home/cgao/git/RustEDA/.work/ibex-sg13g2-repair/sta-agent/full-slew-f1-source01/Common/crates/apps/rusteda-cli" }

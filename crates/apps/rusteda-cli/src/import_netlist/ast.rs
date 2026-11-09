@@ -876,7 +876,21 @@ impl<'a> ExtElaborator<'a> {
                     self.first_pg_span.get_or_insert(pin.span);
                     continue;
                 }
-                let Some(&pin_idx) = cinfo.pin_index.get(&pin.name) else {
+                let indices = cinfo
+                    .pin_index
+                    .get(&pin.name)
+                    .map(|&i| vec![i])
+                    .or_else(|| {
+                        rusteda_formats::verilog::netlist::pin_group(
+                            cinfo
+                                .pins
+                                .iter()
+                                .enumerate()
+                                .map(|(i, p)| (i as u32, p.0.as_str())),
+                            &pin.name,
+                        )
+                    });
+                let Some(indices) = indices else {
                     self.err(
                         C_CELL,
                         pin.span,
@@ -884,7 +898,7 @@ impl<'a> ExtElaborator<'a> {
                     );
                     continue;
                 };
-                if !connected.insert(pin_idx) {
+                if indices.iter().any(|&i| !connected.insert(i)) {
                     self.err(
                         C_CELL,
                         pin.span,
@@ -894,18 +908,23 @@ impl<'a> ExtElaborator<'a> {
                 }
                 let Some(e) = opt_e else { continue };
                 if let Ok(bits) = self.eval_expr(e, true, prefix, &None, scope) {
-                    match bits[..] {
-                        [conn] => {
-                            if let Err(err) = self.g.connect(inst_id, PinRef::Index(pin_idx), conn)
-                            {
-                                self.err(C_CELL, pin.span, err.to_string());
-                            }
-                        }
-                        _ => self.err(
+                    if bits.len() != indices.len() {
+                        self.err(
                             C_WIDTH,
                             e.span,
-                            format!("pin '{}' takes 1 bit, got {} bits", pin.name, bits.len()),
-                        ),
+                            format!(
+                                "pin '{}' takes {} bit(s), got {} bits",
+                                pin.name,
+                                indices.len(),
+                                bits.len()
+                            ),
+                        );
+                        continue;
+                    }
+                    for (index, conn) in indices.into_iter().zip(bits) {
+                        if let Err(err) = self.g.connect(inst_id, PinRef::Index(index), conn) {
+                            self.err(C_CELL, pin.span, err.to_string());
+                        }
                     }
                 }
             }
