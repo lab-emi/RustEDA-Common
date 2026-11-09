@@ -113,9 +113,9 @@ fn parse_bus_type(t: &Group) -> Result<BusType, String> {
                     ));
                 }
             }
-            let expected_w = (f - to).abs() + 1;
+            let expected_w = (i64::from(f) - i64::from(to)).abs() + 1;
             if let Some(w) = w {
-                if w != expected_w {
+                if i64::from(w) != expected_w {
                     return Err(format!(
                         "bit_width ({w}) does not match bit_from ({f})..bit_to ({to})"
                     ));
@@ -134,6 +134,13 @@ fn parse_bus_type(t: &Group) -> Result<BusType, String> {
             return Err("type group must specify bit_from and bit_to (or bit_width > 0)".into());
         }
     };
+    const MAX_BUS_BITS: i64 = 65_536;
+    let width = (i64::from(from) - i64::from(to)).abs() + 1;
+    if width > MAX_BUS_BITS {
+        return Err(format!(
+            "bus width {width} exceeds the {MAX_BUS_BITS}-bit expansion budget"
+        ));
+    }
     Ok(BusType {
         bit_from: from,
         bit_to: to,
@@ -291,6 +298,11 @@ fn resolve_pin_arg(
                     if let (Ok(from), Ok(to)) =
                         (hi_s.trim().parse::<i32>(), lo_s.trim().parse::<i32>())
                     {
+                        let low = bt.bit_from.min(bt.bit_to);
+                        let high = bt.bit_from.max(bt.bit_to);
+                        if !(low..=high).contains(&from) || !(low..=high).contains(&to) {
+                            return Err(format!("pin slice '{arg}' is outside bus {group_name}"));
+                        }
                         let valid = bt.indices();
                         let slice: Vec<i32> = if from <= to {
                             (from..=to).collect()
