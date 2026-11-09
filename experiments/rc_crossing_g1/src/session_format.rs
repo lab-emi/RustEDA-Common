@@ -5,7 +5,6 @@ use crate::{Error, Grid, Query, Record, Result, Table, View, admit};
 
 pub const HEADER_BYTES: usize = 4096;
 pub const ACTIVATION_HEADER_BYTES: usize = 256;
-const WIDTHS: [usize; 5] = [4, 4, 96, 4, 48];
 fn bytes(raw: &[u8], at: usize, n: usize) -> Result<&[u8]> {
     raw.get(at..at.checked_add(n).ok_or(Error::Budget("frame offset"))?)
         .ok_or(Error::Invalid("frame extent"))
@@ -51,36 +50,8 @@ fn zero(raw: &[u8]) -> Result<()> {
     }
     Ok(())
 }
-fn align(n: usize) -> Result<usize> {
-    n.checked_add(63)
-        .map(|n| n & !63)
-        .ok_or(Error::Budget("static alignment"))
-}
-fn layout(counts: [usize; 5]) -> Result<([(usize, usize); 5], usize)> {
-    let mut at = HEADER_BYTES;
-    let mut ranges = [(0, 0); 5];
-    for i in 0..5 {
-        let start = align(at)?;
-        at = counts[i]
-            .checked_mul(WIDTHS[i])
-            .and_then(|n| start.checked_add(n))
-            .ok_or(Error::Budget("static section bytes"))?;
-        ranges[i] = (start, at);
-    }
-    Ok((ranges, at))
-}
-
-/// Exact five-section byte length; semantic validation is a separate step.
-pub fn canonical_static_bytes(view: View<'_>) -> Result<u64> {
-    let counts = [
-        view.offsets.len(),
-        view.entries.len(),
-        view.instances.len(),
-        view.template_offsets.len(),
-        view.rectangles.len(),
-    ];
-    u64::try_from(layout(counts)?.1).map_err(|_| Error::Budget("static length"))
-}
+pub use rusteda_compute::geometry::crossings::device_abi::canonical_static_bytes;
+use rusteda_compute::geometry::crossings::device_abi::layout;
 
 #[derive(Clone, Copy, Debug)]
 pub struct DecodedStatic<'view> {
@@ -337,19 +308,27 @@ pub struct ActivationHeader {
     pub prefixes: u64,
 }
 impl ActivationHeader {
-    pub fn encode(self) -> Result<[u8; ACTIVATION_HEADER_BYTES]> {
-        if self.virtual_shapes > crate::MAX_VIRTUAL as u64
+    /// CUDA uses the same ACT03 fixed offsets with zero CPU workers, the
+    /// authenticated image/range digests and device ABI1. CPU encode is intact.
+    pub fn encode_cuda(
+        self,
+        image_sha: [u8; 32],
+        range_sha: [u8; 32],
+    ) -> Result<[u8; ACTIVATION_HEADER_BYTES]> {
+        if self.workers != 0
+            || self.virtual_shapes > crate::MAX_VIRTUAL as u64
             || self.queries > crate::session::MAX_STREAM_QUERIES
             || self.words != self.virtual_shapes.div_ceil(64)
             || self.success_work > crate::MAX_WORK
-            || !(1..=4).contains(&self.workers)
             || self.prefixes > self.queries
+            || image_sha == [0; 32]
+            || range_sha == [0; 32]
         {
-            return Err(Error::Invalid("activation header bounds"));
+            return Err(Error::Invalid("CUDA activation header bounds"));
         }
-        let mut raw = [0u8; ACTIVATION_HEADER_BYTES];
-        put(&mut raw, 0, b"RG1ACT02")?;
-        put(&mut raw, 8, &2u32.to_le_bytes())?;
+        let mut raw = [0_u8; ACTIVATION_HEADER_BYTES];
+        put(&mut raw, 0, b"RG1ACT03")?;
+        put(&mut raw, 8, &3_u32.to_le_bytes())?;
         put(
             &mut raw,
             12,
@@ -367,7 +346,43 @@ impl ActivationHeader {
         put(&mut raw, 48, &self.static_sha)?;
         put(&mut raw, 80, &self.tape_sha)?;
         put(&mut raw, 112, &self.protocol_sha)?;
-        put(&mut raw, 144, &2u32.to_le_bytes())?;
+        put(&mut raw, 144, &1_u32.to_le_bytes())?;
+        put(&mut raw, 160, &image_sha)?;
+        put(&mut raw, 192, &range_sha)?;
+        put(&mut raw, 224, &1_u32.to_le_bytes())?;
+        Ok(raw)
+    }
+    pub fn encode(self) -> Result<[u8; ACTIVATION_HEADER_BYTES]> {
+        if self.virtual_shapes > crate::MAX_VIRTUAL as u64
+            || self.queries > crate::session::MAX_STREAM_QUERIES
+            || self.words != self.virtual_shapes.div_ceil(64)
+            || self.success_work > crate::MAX_WORK
+            || !(1..=4).contains(&self.workers)
+            || self.prefixes > self.queries
+        {
+            return Err(Error::Invalid("activation header bounds"));
+        }
+        let mut raw = [0u8; ACTIVATION_HEADER_BYTES];
+        put(&mut raw, 0, b"RG1ACT03")?;
+        put(&mut raw, 8, &3u32.to_le_bytes())?;
+        put(
+            &mut raw,
+            12,
+            &(ACTIVATION_HEADER_BYTES as u32).to_le_bytes(),
+        )?;
+        for (at, n) in [
+            (16, self.virtual_shapes),
+            (24, self.queries),
+            (32, self.words),
+            (40, self.success_work),
+            (152, self.prefixes),
+        ] {
+            put(&mut raw, at, &n.to_le_bytes())?;
+        }
+        put(&mut raw, 48, &self.static_sha)?;
+        put(&mut raw, 80, &self.tape_sha)?;
+        put(&mut raw, 112, &self.protocol_sha)?;
+        put(&mut raw, 144, &0u32.to_le_bytes())?;
         put(&mut raw, 148, &self.workers.to_le_bytes())?;
         Ok(raw)
     }
