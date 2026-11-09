@@ -649,37 +649,41 @@ impl Reader<'_, '_> {
                         continue;
                     }
                 };
-                let Some(k) = self.b.pin_index(cell, &pin.name) else {
+                let Some(indices) = self.b.pin_indices(cell, &pin.name) else {
                     let msg = format!("cell '{}' has no pin '{}'", inst.module.name, pin.name);
                     self.error(CELL, pin.span, msg);
                     continue;
                 };
-                if !connected.insert(k) {
+                if indices.iter().any(|&k| !connected.insert(k)) {
                     let msg = format!("pin '{}' of '{}' is connected twice", pin.name, i.name.name);
                     self.error(CELL, pin.span, msg);
                     continue;
                 }
-                // `.P()` leaves the pin unconnected.
                 let Some(e) = e else {
                     continue;
                 };
                 match self.bits(e, true) {
-                    Ok(bits) => match bits[..] {
-                        [c] => {
+                    Ok(bits) if bits.len() == indices.len() => {
+                        for (k, c) in indices.into_iter().zip(bits) {
                             if let Err(err) = self.b.g.connect(id, PinRef::Index(k), c) {
                                 self.error(CELL, pin.span, err.to_string());
                             }
                         }
-                        _ => {
-                            let msg = format!(
-                                "pin '{}' takes 1 bit, {} has {}",
-                                pin.name,
-                                self.quote(e.span),
-                                bit_count(bits.len())
-                            );
-                            self.error(WIDTH, e.span, msg);
-                        }
-                    },
+                    }
+                    Ok(bits) => {
+                        let width = if indices.len() == 1 {
+                            "1 bit".to_string()
+                        } else {
+                            format!("{} bits", indices.len())
+                        };
+                        let msg = format!(
+                            "pin '{}' takes {width}, {} has {}",
+                            pin.name,
+                            self.quote(e.span),
+                            bit_count(bits.len())
+                        );
+                        self.error(WIDTH, e.span, msg);
+                    }
                     Err(d) => self.diags.push(d),
                 }
             }

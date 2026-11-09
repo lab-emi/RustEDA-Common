@@ -255,7 +255,7 @@ fn schema_and_phase_2b_diagnostics() {
     for cmd_line in [
         "create_generated_clock -name gclk -source [get_ports clk] -divide_by 2 [get_pins reg/Q]",
         "set_clock_sense -stop_propagation [get_pins mux/Z]",
-        "set_timing_derate -early 0.95",
+        "set_timing_derate -early -cell_check 0.95",
         "set_sense -type clock -stop_propagation [get_pins mux/Z]",
         "set_data_check -from [get_pins a] -to [get_pins b] -setup 0.1",
         "set_ideal_network [get_ports rst_n]",
@@ -305,4 +305,43 @@ fn propagated_clock_commands_are_typed() {
         s.cmds[1].kind,
         CmdKind::UnsetPropagatedClock { .. }
     ));
+}
+
+// SDC-REQ-0071: global factors and fail-closed unsupported scopes.
+#[test]
+fn global_timing_derates_are_typed_and_scopes_fail_closed() {
+    let (sdc, diags) =
+        sdc::read_str("set_timing_derate -early 0.95\nset_timing_derate -late 1.05\n");
+    assert!(diags.is_empty(), "{diags:?}");
+    assert!(matches!(
+        sdc.cmds[0].kind,
+        CmdKind::SetTimingDerate {
+            factor: 0.95,
+            early_late: sdc::EarlyLateScope::Early,
+            ..
+        }
+    ));
+    assert!(matches!(
+        sdc.cmds[1].kind,
+        CmdKind::SetTimingDerate {
+            factor: 1.05,
+            early_late: sdc::EarlyLateScope::Late,
+            ..
+        }
+    ));
+    for input in [
+        "set_timing_derate 0.95",
+        "set_timing_derate -early 0",
+        "set_timing_derate -late -1",
+        "set_timing_derate -early -late 1",
+        "set_timing_derate -cell_check 1.1",
+        "set_timing_derate -increment 1.1",
+        "set_timing_derate 1.1 [get_cells u1]",
+    ] {
+        let (_, diags) = sdc::read_str(input);
+        assert!(
+            diags.iter().any(|d| d.severity == Severity::Error),
+            "{input}: {diags:?}"
+        );
+    }
 }

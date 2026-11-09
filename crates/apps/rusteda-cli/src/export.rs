@@ -8,7 +8,7 @@ use std::collections::HashMap;
 #[cfg(test)]
 use std::fmt::Write as _;
 use std::fs::{self, OpenOptions};
-use std::io::{BufWriter, Write as _};
+use std::io::{BufWriter, Read as _, Write as _};
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -198,6 +198,7 @@ pub(crate) fn run_export(
     ws_arg: &str,
     rev_spec: &str,
     out_file: &Path,
+    cell_buses: Option<&Path>,
 ) -> Result<OutputOutcome, Error> {
     let rev = ws.resolve_query(rev_spec)?;
     let revision = ws.revision(rev)?;
@@ -214,7 +215,26 @@ pub(crate) fn run_export(
     }
     let rbin = netlist::open_rev(&revision)?;
     let f = netlist::decode(&rbin)?;
-    let plan = frozen::Plan::new(&f, limits)?;
+    let mut plan = frozen::Plan::new(&f, limits)?;
+    if let Some(path) = cell_buses {
+        const MAX_SCHEMA_BYTES: u64 = 2 * 1024 * 1024;
+        let file = fs::File::open(path).map_err(|e| Error::io(path, e))?;
+        if !file.metadata().map_err(|e| Error::io(path, e))?.is_file() {
+            return Err(Error::input_rejected(
+                "CELL_BUS_SCHEMA: expected a regular JSON file",
+            ));
+        }
+        let mut bytes = Vec::new();
+        file.take(MAX_SCHEMA_BYTES + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|e| Error::io(path, e))?;
+        if bytes.len() as u64 > MAX_SCHEMA_BYTES {
+            return Err(Error::input_rejected("CELL_BUS_SCHEMA: JSON exceeds 2 MiB"));
+        }
+        let schema: frozen::CellBusSchemas = serde_json::from_slice(&bytes)
+            .map_err(|e| Error::input_rejected(format!("CELL_BUS_SCHEMA: {e}")))?;
+        plan.set_cell_buses(&schema)?;
+    }
 
     if let Some(parent) = out_file.parent() {
         if !parent.as_os_str().is_empty() {

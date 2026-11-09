@@ -241,6 +241,9 @@ pub struct ExportArgs {
     /// Destination structural Verilog file for the netlist table.
     #[arg(long = "netlist", value_name = "FILE")]
     pub netlist: PathBuf,
+    /// Explicit cell bus ranges, as {cell: {port: [msb, lsb]}}. Scalar pin names are otherwise preserved.
+    #[arg(long = "cell-buses", value_name = "JSON")]
+    pub cell_buses: Option<PathBuf>,
 }
 
 #[derive(Args, Debug)]
@@ -918,7 +921,13 @@ pub fn run_with_version(args: Vec<OsString>, version: &'static str) -> ExitCode 
                     );
                 }
             };
-            match run_export(&ws, &ws_arg, &exp.rev, &exp.netlist) {
+            match run_export(
+                &ws,
+                &ws_arg,
+                &exp.rev,
+                &exp.netlist,
+                exp.cell_buses.as_deref(),
+            ) {
                 Ok(out) => finish_ok(out, format, quiet),
                 Err(e) => finish_error(sub_name, Some(&ws_arg), None, e, Vec::new(), format, quiet),
             }
