@@ -6,6 +6,8 @@
 //! capacitances pF, resistances kOhm.
 use crate::ComputeError;
 
+pub mod charge;
+
 /// Progress-normalized trip points: falling voltages are mapped through 1-v.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Thresholds {

@@ -725,7 +725,7 @@ pub static SCHEMAS: &[CmdSchema] = &[
     },
     CmdSchema {
         name: "set_timing_derate",
-        status: CmdStatus::Phase2b,
+        status: CmdStatus::Interpreted,
         min_pos: 1,
         max_pos: 2,
         options: OPTS_TIMING_DERATE,

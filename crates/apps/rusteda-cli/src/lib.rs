@@ -238,9 +238,33 @@ pub struct ExportArgs {
     /// Revision to export from (default `HEAD`).
     #[arg(long = "rev", default_value = "HEAD", value_name = "REV")]
     pub rev: String,
-    /// Destination structural Verilog file for the netlist table.
+    /// Destination file for the netlist table projection.
     #[arg(long = "netlist", value_name = "FILE")]
     pub netlist: PathBuf,
+    /// Explicit cell bus ranges, as {cell: {port: [msb, lsb]}}. Scalar pin names are otherwise preserved.
+    #[arg(long = "cell-buses", value_name = "JSON")]
+    pub cell_buses: Option<PathBuf>,
+    /// Native structural projection format; Verilog remains the default.
+    #[arg(long, value_enum, default_value_t = ExportKind::Verilog)]
+    pub kind: ExportKind,
+    /// Auxiliary memory ceiling for connectivity JSON (maximum 64 MiB).
+    #[arg(long, default_value_t = 67_108_864)]
+    pub connectivity_max_aux_bytes: u64,
+    /// Output ceiling for connectivity JSON (maximum 64 MiB).
+    #[arg(long, default_value_t = 67_108_864)]
+    pub connectivity_max_output_bytes: u64,
+    /// Cumulative alias/projection work ceiling (maximum 10 million).
+    #[arg(long, default_value_t = 10_000_000)]
+    pub connectivity_max_work: u64,
+}
+
+/// Native read-only netlist projection selected by `export --kind`.
+#[derive(clap::ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExportKind {
+    /// Structural Verilog, with explicitly supplied cell buses if requested.
+    Verilog,
+    /// Connectivity JSON from validated mmap tables, with canonical alias bits.
+    ConnectivityJson,
 }
 
 #[derive(Args, Debug)]
@@ -918,7 +942,7 @@ pub fn run_with_version(args: Vec<OsString>, version: &'static str) -> ExitCode 
                     );
                 }
             };
-            match run_export(&ws, &ws_arg, &exp.rev, &exp.netlist) {
+            match run_export(&ws, &ws_arg, exp) {
                 Ok(out) => finish_ok(out, format, quiet),
                 Err(e) => finish_error(sub_name, Some(&ws_arg), None, e, Vec::new(), format, quiet),
             }

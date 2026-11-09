@@ -457,7 +457,7 @@ pub enum CmdKind {
     },
     /// `set_max_time_borrow` (SDC-REQ-0033).
     SetMaxTimeBorrow { value: f64, objects: Obj },
-    /// `set_timing_derate` (Phase 2b; `D0010` in Phase 2a).
+    /// Global early/late cell and net delay factors (`set_timing_derate`).
     SetTimingDerate {
         factor: f64,
         early_late: EarlyLateScope,
