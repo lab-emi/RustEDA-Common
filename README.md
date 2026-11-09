@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/assets/rusteda-common-wordmark.svg" alt="RustEDA Common" width="440"></p>
+<p align="center"><img src="docs/assets/rusteda-common-wordmark.svg" alt="RustEDA Common" width="360"></p>
 
 <h1 align="center">The foundation beneath the design loop.</h1>
 
@@ -6,7 +6,7 @@
 
 <picture>
 <source media="(prefers-reduced-motion: reduce)" srcset="docs/assets/rusteda-common-banner.svg">
-<img src="docs/assets/rusteda-common-banner.gif" alt="Shared models, formats, disk workspaces and compute for RustEDA" width="1200" height="360">
+<img src="docs/assets/rusteda-common-banner.gif" alt="Shared models, formats, disk workspaces and compute for RustEDA" width="1200">
 </picture>
 
 The single implementation source for the shared RustEDA foundation:
