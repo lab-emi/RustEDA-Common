@@ -67,10 +67,28 @@ pub fn charged_fraction(u: f64, tau: f64) -> f64 {
     }
     let x = u / tau;
     if x < 1e-3 {
-        // Cancellation-free series of 1-(1-exp(-x))/x.
-        x * (0.5 + x * (-1.0 / 6.0 + x * (1.0 / 24.0 + x * (-1.0 / 120.0 + x / 720.0))))
+        charged_series(x)
     } else {
         1.0 + (-x).exp_m1() / x
+    }
+}
+
+/// The cancellation-free series of `1-(1-exp(-x))/x` that [`charged_fraction`] takes below
+/// `x = 1e-3`.
+#[inline]
+fn charged_series(x: f64) -> f64 {
+    x * (0.5 + x * (-1.0 / 6.0 + x * (1.0 / 24.0 + x * (-1.0 / 120.0 + x / 720.0))))
+}
+
+/// [`charged_fraction`] of `x = u / tau` with `e = expm1(-x)` given by the caller (`u` and
+/// `tau` nonzero): the same operations, so the value is bit-identical, for callers that need
+/// `e` themselves (`-(-u / tau)` and `-(u / tau)` are the same double).
+#[inline]
+fn charged_given(x: f64, e: f64) -> f64 {
+    if x < 1e-3 {
+        charged_series(x)
+    } else {
+        1.0 + e / x
     }
 }
 
@@ -99,8 +117,10 @@ fn fit_duration(slew: f64, cap: f64, res: f64, t: Thresholds) -> Result<f64, Com
     let mut x = (target / (t.output - t.lower)).min(hi);
     let tolerance = (hi * 1e-12).max(1e-15);
     for _ in 0..56 {
-        let mid = crossing(x, tau, t.output);
-        let lower = crossing(x, tau, t.lower);
+        // Both crossings of this source ramp share its charged fraction and settling factors.
+        let settle = Settle::new(x, tau);
+        let (mid, mid_e) = settle.crossing(t.output);
+        let (lower, lower_e) = settle.crossing(t.lower);
         let residual = mid - lower - target;
         if residual.abs() <= tolerance {
             return Ok(x);
@@ -110,8 +130,9 @@ fn fit_duration(slew: f64, cap: f64, res: f64, t: Thresholds) -> Result<f64, Com
         } else {
             hi = x;
         }
-        let slope =
-            crossing_gradient(x, tau, t.output, mid) - crossing_gradient(x, tau, t.lower, lower);
+        let late = std::cell::OnceCell::new();
+        let slope = settle.gradient(t.output, mid, mid_e, &late)
+            - settle.gradient(t.lower, lower, lower_e, &late);
         let next = x - residual / slope;
         x = if next > lo && next < hi {
             next
@@ -170,8 +191,18 @@ impl Poles {
     /// of `[0, d - a ln(1 - p)]` (at most 80 halvings to a relative 1e-13), replayed with the
     /// certified decisions of [`replay`] when its error model holds.
     fn crossing(self, d: f64, p: f64) -> f64 {
+        self.crossing_of(self.ramps(d), d, p)
+    }
+
+    /// The ramps of both poles for the duration `d`, which [`Self::crossing_of`] takes.
+    fn ramps(self, d: f64) -> (Ramp, Ramp) {
+        (Ramp::new(d, self.a), Ramp::new(d, self.b))
+    }
+
+    /// [`Self::crossing`] with the ramps `self.ramps(d)` given: the crossings of several trip
+    /// points of one waveform share them.
+    fn crossing_of(self, (ra, rb): (Ramp, Ramp), d: f64, p: f64) -> f64 {
         // `self.root(x, d)` with the late-time factors of both poles computed once.
-        let (ra, rb) = (Ramp::new(d, self.a), Ramp::new(d, self.b));
         let w = self.root_weight;
         let f = |x: f64| w * ra.at(x) + (1.0 - w) * rb.at(x);
         let hi = d - self.a * (1.0 - p).ln();
@@ -378,8 +409,11 @@ fn solve_driver(
     if (nominal - actual).abs() > total.max(1e-16) * 1e-8 {
         return Err(ComputeError::Invalid("RC charge residual exceeded".into()));
     }
-    let slew = (poles.crossing(duration, t.upper) - poles.crossing(duration, t.lower)) / t.derate;
-    let root_crossing = poles.crossing(duration, t.output);
+    let ramps = poles.ramps(duration);
+    let slew = (poles.crossing_of(ramps, duration, t.upper)
+        - poles.crossing_of(ramps, duration, t.lower))
+        / t.derate;
+    let root_crossing = poles.crossing_of(ramps, duration, t.output);
     if [delay, slew, duration, root_crossing]
         .iter()
         .any(|v| !v.is_finite())
@@ -558,8 +592,11 @@ pub fn gate_one_step(
         ));
     }
     let duration = fit_duration(s, capacitance, res, t)?;
-    let slew = (poles.crossing(duration, t.upper) - poles.crossing(duration, t.lower)) / t.derate;
-    let root_crossing = poles.crossing(duration, t.output);
+    let ramps = poles.ramps(duration);
+    let slew = (poles.crossing_of(ramps, duration, t.upper)
+        - poles.crossing_of(ramps, duration, t.lower))
+        / t.derate;
+    let root_crossing = poles.crossing_of(ramps, duration, t.output);
     if [slew, duration, root_crossing]
         .iter()
         .any(|v| !v.is_finite())
@@ -619,6 +656,107 @@ fn crossing_gradient(duration: f64, tau: f64, p: f64, time: f64) -> f64 {
         0.5 + x * (1.0 / 12.0 - x * x / 720.0)
     } else {
         1.0 - 1.0 / x + 1.0 / x.exp_m1()
+    }
+}
+
+/// One pole time `tau` under a source ramp of duration `duration`: the factors that
+/// [`crossing`] and [`crossing_gradient`] compute from these two alone, computed once for the
+/// crossings of several trip points of the same ramp (STA-REQ-0729). Every value is the one of
+/// the plain functions bit for bit: the same operations on the same operands, in the same order.
+#[derive(Debug, Clone, Copy)]
+struct Settle {
+    duration: f64,
+    tau: f64,
+    /// `charged_fraction(duration, tau)` and `expm1(-duration / tau)`, with nonzero `duration`
+    /// and `tau` (`plain` otherwise: the plain functions are used).
+    charged: f64,
+    expm1: f64,
+    plain: bool,
+}
+
+impl Settle {
+    fn new(duration: f64, tau: f64) -> Self {
+        let plain = tau == 0.0 || duration == 0.0;
+        let (charged, expm1) = if plain {
+            (0.0, 0.0)
+        } else {
+            let x = duration / tau;
+            let e = (-x).exp_m1();
+            (charged_given(x, e), e)
+        };
+        Self {
+            duration,
+            tau,
+            charged,
+            expm1,
+            plain,
+        }
+    }
+
+    /// `crossing(duration, tau, p)`, with `expm1(-t / tau)` of the returned time `t` when the
+    /// solve evaluated it there.
+    fn crossing(&self, p: f64) -> (f64, Option<f64>) {
+        let (duration, tau) = (self.duration, self.tau);
+        if self.plain {
+            return (crossing(duration, tau, p), None);
+        }
+        if p >= self.charged {
+            return (
+                duration - tau * ((1.0 - p) * duration / (-tau * self.expm1)).ln(),
+                None,
+            );
+        }
+        if p * duration / tau > 40.0 {
+            return (p * duration + tau, None);
+        }
+        let mut lo = 0.0;
+        let mut hi = duration;
+        let mut x = (p * duration + tau).min(hi);
+        for _ in 0..48 {
+            // `ramp_voltage(x, duration, tau)` and the slope's `expm1(-x / tau)` evaluated once.
+            let e = (-x / tau).exp_m1();
+            let v = if x > 0.0 && x <= duration {
+                x / duration * charged_given(x / tau, e)
+            } else {
+                ramp_voltage(x, duration, tau)
+            };
+            if (v - p).abs() <= 4.0 * f64::EPSILON {
+                return (x, Some(e));
+            }
+            if v < p {
+                lo = x;
+            } else {
+                hi = x;
+            }
+            let slope = -e / duration;
+            let next = x - (v - p) / slope;
+            x = if next > lo && next < hi {
+                next
+            } else {
+                lo + (hi - lo) * 0.5
+            };
+        }
+        (lo + (hi - lo) * 0.5, None)
+    }
+
+    /// `crossing_gradient(duration, tau, p, time)`, with `expm1(-time / tau)` when known and the
+    /// late-ramp gradient, which depends on the ramp alone, shared through `late`.
+    fn gradient(
+        &self,
+        p: f64,
+        time: f64,
+        expm1: Option<f64>,
+        late: &std::cell::OnceCell<f64>,
+    ) -> f64 {
+        let (duration, tau) = (self.duration, self.tau);
+        if tau == 0.0 {
+            return p;
+        }
+        if time <= duration {
+            let e = expm1.unwrap_or_else(|| (-time / tau).exp_m1());
+            return p / (-e);
+        }
+        *late.get_or_init(|| crossing_gradient(duration, tau, p, time))
     }
 }
 
@@ -884,9 +1022,10 @@ pub fn wire(tau: f64, slew: f64, t: Thresholds, primary: bool) -> Result<(f64, f
         )
     } else {
         let duration = slew * t.derate / (t.upper - t.lower);
+        let settle = Settle::new(duration, tau);
         (
-            crossing(duration, tau, t.input) - t.output * duration,
-            (crossing(duration, tau, t.upper) - crossing(duration, tau, t.lower)) / t.derate,
+            settle.crossing(t.input).0 - t.output * duration,
+            (settle.crossing(t.upper).0 - settle.crossing(t.lower).0) / t.derate,
         )
     };
     if !delay.is_finite() || !transition.is_finite() {

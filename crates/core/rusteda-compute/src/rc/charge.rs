@@ -267,8 +267,12 @@ pub fn solve(
     }
     let (delay, slew) = eval(cap);
     let duration = fit_duration(slew, cap, resistance, t)?;
-    let root_crossing = poles.crossing(duration, t.output);
-    let slew = (poles.crossing(duration, t.upper) - poles.crossing(duration, t.lower)) / t.derate;
+    // The three trip points of one waveform share its pole ramps.
+    let ramps = poles.ramps(duration);
+    let root_crossing = poles.crossing_of(ramps, duration, t.output);
+    let slew = (poles.crossing_of(ramps, duration, t.upper)
+        - poles.crossing_of(ramps, duration, t.lower))
+        / t.derate;
     if [delay, slew, duration, root_crossing]
         .iter()
         .any(|x| !x.is_finite())

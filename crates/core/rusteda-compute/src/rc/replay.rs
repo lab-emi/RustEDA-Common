@@ -272,8 +272,10 @@ impl Ramp {
             return (v, (1.0 - v) / tau);
         }
         if time <= duration {
-            let v = time / duration * super::charged_fraction(time, tau);
-            (v, -(-time / tau).exp_m1() / duration)
+            // `charged_fraction(time, tau)` and the slope share `expm1(-time / tau)`.
+            let e = (-time / tau).exp_m1();
+            let v = time / duration * super::charged_given(time / tau, e);
+            (v, -e / duration)
         } else {
             let e = (-(time - duration) / tau).exp();
             (1.0 + self.late * e, -self.late * e / tau)
