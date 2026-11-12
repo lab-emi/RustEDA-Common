@@ -36,6 +36,8 @@ rustc-hash = "=2.1.2"
 bytemuck = { version = "=1.25.2", features = ["derive"] }
 # Memory-mapped section files of the workspace store.
 memmap2 = "=0.9.11"
+# SHA-256 digests of the RC estimate's inputs and output (`rusteda estimate-spef`).
+sha2 = "=0.10.9"
 # Checksums of workspace section records (XXH3-64).
 xxhash-rust = { version = "=0.8.19", default-features = false, features = ["xxh3"] }
 smallvec = { version = "=1.16.2", default-features = false }

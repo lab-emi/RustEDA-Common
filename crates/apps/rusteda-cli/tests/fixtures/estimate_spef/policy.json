@@ -1,0 +1,11 @@
+{
+  "schema": "rusteda.rc-estimate-policy.v1",
+  "r_ohm_per_um": 3.3,
+  "c_pf_per_um": 0.00019,
+  "detour": 1.25,
+  "max_segment_um": 50,
+  "limits": {"max_nets": 100, "max_pins_per_net": 64, "max_nodes": 10000},
+  "macro_blockage": {"grid_um": 10, "max_searches": 1000},
+  "note": "fixture values in µm and \"pF\",\ttab, 1e-05 / 2.5E+3",
+  "list": [1, 2.5e-05, -0.0, 1e16, 123456789.125, true, null, {}, []]
+}

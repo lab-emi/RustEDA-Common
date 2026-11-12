@@ -1,0 +1,82 @@
+VERSION 5.8 ;
+MACRO BUF
+  CLASS CORE ;
+  SIZE 2.0 BY 4.0 ;
+  PIN A
+    DIRECTION INPUT ;
+    USE SIGNAL ;
+    PORT
+      LAYER Metal1 ;
+        RECT 0.1 1.0 0.3 1.4 ;
+        RECT 0.1 2.0 0.3 2.6 ;
+        RECT 0.2 0.4 0.4 0.8 ;
+    END
+  END A
+  PIN Y
+    DIRECTION OUTPUT ;
+    USE SIGNAL ;
+    PORT
+      LAYER Metal1 ;
+        RECT 1.5 1.0 1.9 3.0 ;
+    END
+  END Y
+  PIN VDD
+    DIRECTION INOUT ;
+    USE POWER ;
+    PORT
+      LAYER Metal1 ;
+        RECT 0.0 3.8 2.0 4.0 ;
+    END
+  END VDD
+END BUF
+MACRO NAND2
+  CLASS CORE ;
+  SIZE 3.0 BY 4.0 ;
+  PIN A
+    DIRECTION INPUT ;
+    PORT
+      LAYER Metal1 ;
+        RECT 0.2 1.0 0.6 1.6 ;
+    END
+  END A
+  PIN B
+    DIRECTION INPUT ;
+    PORT
+      LAYER Metal1 ;
+        RECT 1.2 1.0 1.6 1.6 ;
+    END
+  END B
+  PIN Y
+    DIRECTION OUTPUT ;
+    PORT
+      LAYER Metal1 ;
+        RECT 2.4 0.5 2.8 3.5 ;
+    END
+  END Y
+  PIN IO
+    DIRECTION INOUT ;
+    PORT
+      LAYER Metal1 ;
+        RECT 2.0 3.0 2.2 3.2 ;
+    END
+  END IO
+END NAND2
+MACRO RAM
+  CLASS BLOCK ;
+  SIZE 40.0 BY 30.0 ;
+  PIN D
+    DIRECTION INPUT ;
+    PORT
+      LAYER Metal4 ;
+        RECT 0.0 10.0 0.5 10.5 ;
+    END
+  END D
+  PIN Q
+    DIRECTION OUTPUT ;
+    PORT
+      LAYER Metal4 ;
+        RECT 39.5 20.0 40.0 20.5 ;
+    END
+  END Q
+END RAM
+END LIBRARY

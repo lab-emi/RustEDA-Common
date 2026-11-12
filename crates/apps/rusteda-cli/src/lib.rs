@@ -4,6 +4,7 @@
 //! The `rusteda` command-line program (`docs/specs/rusteda-cli/README.md`, RCLI-REQ-0001 to
 //! RCLI-REQ-0018).
 
+mod estimate;
 mod export;
 mod import;
 mod import_lib;
@@ -128,6 +129,8 @@ pub enum Cmd {
     Revert(RevertArgs),
     /// Export a committed table to a file.
     Export(ExportArgs),
+    /// Write a placement-based RC estimate (SPEF) of a placed DEF into a fresh directory.
+    EstimateSpef(estimate::EstimateArgs),
     /// Print a shell completion script.
     Completions(CompletionsArgs),
 }
@@ -317,6 +320,7 @@ fn prescan(args: &[OsString]) -> Prescan {
         "diff",
         "revert",
         "export",
+        "estimate-spef",
         "completions",
     ];
     let mut i = 0;
@@ -678,6 +682,7 @@ pub fn run_with_version(args: Vec<OsString>, version: &'static str) -> ExitCode 
         Cmd::Diff(_) => "rusteda diff",
         Cmd::Revert(_) => "rusteda revert",
         Cmd::Export(_) => "rusteda export",
+        Cmd::EstimateSpef(_) => "rusteda estimate-spef",
         Cmd::Completions(_) => "rusteda completions",
     };
 
@@ -685,6 +690,11 @@ pub fn run_with_version(args: Vec<OsString>, version: &'static str) -> ExitCode 
         let err = Error::usage(format!("{sub_name} requires -w/--workspace <DIR>"));
         return finish_error(sub_name, None, None, err, Vec::new(), format, quiet);
     };
+    // The estimate writes the reference estimator's files and summary line, not a revision
+    // and envelope (RCLI-REQ-0026).
+    if let Cmd::EstimateSpef(est) = &cli.cmd {
+        return estimate::run(ws_path, est);
+    }
     let ws_arg = ws_path.display().to_string();
     let inv = Invocation::new("rusteda", version, sub_name, argv_strings.clone());
 
@@ -955,6 +965,6 @@ pub fn run_with_version(args: Vec<OsString>, version: &'static str) -> ExitCode 
                 Err(e) => finish_error(sub_name, Some(&ws_arg), None, e, Vec::new(), format, quiet),
             }
         }
-        Cmd::Completions(_) => unreachable!(),
+        Cmd::EstimateSpef(_) | Cmd::Completions(_) => unreachable!(),
     }
 }

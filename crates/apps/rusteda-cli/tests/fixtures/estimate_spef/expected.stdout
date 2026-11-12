@@ -1,0 +1,1 @@
+{"nets": 8, "rc_nodes": 56, "unplaced_connections": 5, "total_wire_um": 1953.112, "total_cap_pf": 0.371091, "macro_blockage": {"macros": 1, "detoured_edges": 2, "searches": 2, "extra_wire_um": 99.6}}

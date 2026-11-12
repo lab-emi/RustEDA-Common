@@ -1,0 +1,61 @@
+{
+  "schema": "rusteda.rc-estimate-result.v1",
+  "scope": "placement_estimate_not_signoff",
+  "inputs": {
+    "def": {
+      "path": "@DIR@/placed.def",
+      "sha256": "18303088ae5a413d5c1c1903429ce70ea18b5d723f3263cfa8bb009163ea9865"
+    },
+    "lef": {
+      "path": "@DIR@/cells.lef",
+      "sha256": "7f331e5d999080ac04367c9e2bdab2047f9759efc7d134efb2a54ad1783e2010"
+    },
+    "policy": {
+      "path": "@DIR@/policy.json",
+      "sha256": "196cf0dc2c94ea6e3664bc42566876cae782914a64e9b017253f1f159e7f5797"
+    }
+  },
+  "output": {
+    "path": "@WS@/estimate.spef",
+    "sha256": "991e226d397fa8f90ed6df0147e1645dac2e04dc4edb7bffbe0f8d2943633204"
+  },
+  "nets": 8,
+  "rc_nodes": 56,
+  "unplaced_connections": 5,
+  "total_wire_um": 1953.112,
+  "total_cap_pf": 0.371091,
+  "policy": {
+    "schema": "rusteda.rc-estimate-policy.v1",
+    "r_ohm_per_um": 3.3,
+    "c_pf_per_um": 0.00019,
+    "detour": 1.25,
+    "max_segment_um": 50,
+    "limits": {
+      "max_nets": 100,
+      "max_pins_per_net": 64,
+      "max_nodes": 10000
+    },
+    "macro_blockage": {
+      "grid_um": 10,
+      "max_searches": 1000
+    },
+    "note": "fixture values in \u00b5m and \"pF\",\ttab, 1e-05 / 2.5E+3",
+    "list": [
+      1,
+      2.5e-05,
+      -0.0,
+      1e+16,
+      123456789.125,
+      true,
+      null,
+      {},
+      []
+    ]
+  },
+  "macro_blockage": {
+    "macros": 1,
+    "detoured_edges": 2,
+    "searches": 2,
+    "extra_wire_um": 99.6
+  }
+}

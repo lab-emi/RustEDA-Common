@@ -28,6 +28,8 @@ clap_complete.workspace = true
 rayon.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
+rustc-hash.workspace = true
 
 [target.'cfg(unix)'.dependencies]
 libc.workspace = true

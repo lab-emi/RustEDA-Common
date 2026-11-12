@@ -1,0 +1,40 @@
+VERSION 5.8 ;
+DIVIDERCHAR "/" ;
+BUSBITCHARS "[]" ;
+DESIGN tiny ;
+UNITS DISTANCE MICRONS 1000 ;
+DIEAREA ( 0 0 ) ( 200000 150000 ) ;
+COMPONENTS 11 ;
+- u1 BUF + PLACED ( 10000 10000 ) N ;
+- u2 BUF + PLACED ( 150000 20000 ) FS ;
+- u3 NAND2 + PLACED ( 90000 120000 ) S ;
+- u4/x.y NAND2 + PLACED ( 20000 100000 ) FN ;
+- ram0 RAM + FIXED ( 60000 40000 ) N ;
+- u5 BUF + PLACED ( 30000 60000 ) W ;
+- u6 BUF + PLACED ( 170000 60000 ) E ;
+- u7 BUF + PLACED ( 110000 30000 ) FW ;
+- u8 BUF + UNPLACED ;
+- u9 BUF + PLACED ( 45000 54000 ) N ;
+- u10 BUF + PLACED ( 110000 53000 ) N ;
+END COMPONENTS
+PINS 3 ;
+- clk + NET clk + DIRECTION INPUT + USE SIGNAL
+  + PORT + LAYER Metal3 ( -190 0 ) ( 190 380 ) + FIXED ( 0 75000 ) N ;
+- out\[0\] + NET out[0] + DIRECTION OUTPUT + USE SIGNAL + PORT + LAYER Metal3 ( 0 0 ) ( 380 380 ) + PLACED ( 199620 75000 ) N ;
+- floating + NET floating + DIRECTION INPUT + USE SIGNAL ;
+END PINS
+NETS 9 ;
+- clk ( PIN clk ) ( u1 A ) ( u5 A )
+  ( u6 A ) ( u3 B ) + USE CLOCK ;
+- n1 ( u1 Y ) ( u2 A ) ( u4/x.y A ) + USE SIGNAL ;
+- n2 ( u5 Y ) ( u6 A ) ( u7 A ) ( u3 A ) ( u4/x.y B ) ( u2 VDD ) ( u1 Q ) + USE SIGNAL ;
+- out[0] ( u3 Y ) ( PIN out[0] ) ( ram0 D ) + USE SIGNAL ;
+- n3 ( ram0 Q ) ( u6 A ) ( u4/x.y IO ) ;
+- lonely ( PIN floating ) ( u2 Q ) ;
+- n.4 ( u7 Y )
+  + ROUTED Metal2 ( 1 2 ) ( 3 4 ) NEW Metal3 ( 5 6 )
+  ( u2 Y ) ;
+- n5 ( u9 Y ) ( u10 A ) ;
+- n6 ( u10 Y ) ( ram0 D ) ( u9 A ) ;
+END NETS
+END DESIGN
