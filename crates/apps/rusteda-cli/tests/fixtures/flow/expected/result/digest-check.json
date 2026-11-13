@@ -1,0 +1,17 @@
+{
+  "schema": "rusteda.frontend-digest-check.v1",
+  "cache": {
+    "path": "@RUN@/frontend/sha256-cache.json",
+    "sha256": "@SHA:cache@",
+    "bytes": "@BYTES:cache@"
+  },
+  "checked": {
+    "@FIX@/recipe/delay_helper.py": "61478a4afebfff1de3df48af08c3837581c7f90819153851fe82d44657551a48",
+    "@FIX@/recipe/ecos.py": "530d6ba13787d5d2fd550acc44afe202b83494ace0e84a2fab85f6918a675c0b",
+    "@FIX@/recipe/estimator.py": "8310d4fff67da0bcb0ed81c994b52d36cae8e86d29dce5783deb3bf8be711172",
+    "@FIX@/recipe/liberty_lite.py": "3be3809a76ef02af2c44ce6e4ae5c919ed63176cbcd78d0a3d909efc6900eb41",
+    "@FIX@/recipe/prepare.py": "a8fd65a4586e7300585fc7c3021b1364ebb4206b783f0002b5b946471be14ee7",
+    "@FIX@/recipe/sizing_helper.py": "5feef8908b45bcb5055a0c5bcb8156a93210e44595f3f7d9610aafc7013d9db9",
+    "@XXHSUM@": "@SHA:xxhsum@"
+  }
+}

@@ -144,13 +144,12 @@ pub fn run(ws: &Path, args: &EcoRoundArgs) -> ExitCode {
 const OPERATIONS: [&str; 5] = ["reset", "fanout", "primary-clock", "electrical", "hold"];
 
 fn round(ws: &Path, args: &EcoRoundArgs, started: Instant) -> Res<String> {
-    need(
-        OPERATIONS.contains(&args.operation.as_str()),
-        format!(
-            "USAGE: --operation must be one of {}",
-            OPERATIONS.join(", ")
-        ),
-    )?;
+    if !OPERATIONS.contains(&args.operation.as_str()) {
+        return Err(Failure::new(
+            "USAGE",
+            format!("--operation must be one of {}", OPERATIONS.join(", ")),
+        ));
+    }
     let context = Context::load(&args.context)?;
     super::trace("context loaded");
     let docs = Docs::default();

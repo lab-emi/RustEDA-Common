@@ -1,0 +1,812 @@
+{
+ "creator": "RustEDA native connectivity v1",
+ "modules": {
+  "mini": {
+   "ports": {
+    "clk_i": {
+     "direction": "input",
+     "bits": [
+      2
+     ]
+    },
+    "rst_ni": {
+     "direction": "input",
+     "bits": [
+      3
+     ]
+    },
+    "a_i": {
+     "direction": "input",
+     "bits": [
+      4
+     ]
+    },
+    "b_i": {
+     "direction": "input",
+     "bits": [
+      5
+     ]
+    },
+    "q_o": {
+     "direction": "output",
+     "bits": [
+      6
+     ]
+    }
+   },
+   "cells": {
+    "gate": {
+     "type": "AND2X1",
+     "port_directions": {
+      "A": "input",
+      "B": "input",
+      "Y": "output"
+     },
+     "connections": {
+      "A": [
+       2
+      ],
+      "B": [
+       7
+      ],
+      "Y": [
+       8
+      ]
+     }
+    },
+    "rbuf": {
+     "type": "BUFX1",
+     "port_directions": {
+      "A": "input",
+      "Y": "output"
+     },
+     "connections": {
+      "A": [
+       3
+      ],
+      "Y": [
+       9
+      ]
+     }
+    },
+    "u_hf": {
+     "type": "NAND2X1",
+     "port_directions": {
+      "A": "input",
+      "B": "input",
+      "Y": "output"
+     },
+     "connections": {
+      "A": [
+       4
+      ],
+      "B": [
+       5
+      ],
+      "Y": [
+       10
+      ]
+     }
+    },
+    "u_en": {
+     "type": "INVX1",
+     "port_directions": {
+      "A": "input",
+      "Y": "output"
+     },
+     "connections": {
+      "A": [
+       11
+      ],
+      "Y": [
+       7
+      ]
+     }
+    },
+    "u_o": {
+     "type": "BUFX2",
+     "port_directions": {
+      "A": "input",
+      "Y": "output"
+     },
+     "connections": {
+      "A": [
+       12
+      ],
+      "Y": [
+       6
+      ]
+     }
+    },
+    "r0": {
+     "type": "DFFX1",
+     "port_directions": {
+      "CK": "input",
+      "D": "input",
+      "RB": "input",
+      "Q": "output"
+     },
+     "connections": {
+      "CK": [
+       2
+      ],
+      "D": [
+       13
+      ],
+      "RB": [
+       3
+      ],
+      "Q": [
+       14
+      ]
+     }
+    },
+    "u_r0": {
+     "type": "INVX1",
+     "port_directions": {
+      "A": "input",
+      "Y": "output"
+     },
+     "connections": {
+      "A": [
+       14
+      ],
+      "Y": [
+       15
+      ]
+     }
+    },
+    "f0": {
+     "type": "DFFX1",
+     "port_directions": {
+      "CK": "input",
+      "D": "input",
+      "RB": "input",
+      "Q": "output"
+     },
+     "connections": {
+      "CK": [
+       8
+      ],
+      "D": [
+       16
+      ],
+      "RB": [
+       9
+      ],
+      "Q": [
+       11
+      ]
+     }
+    },
+    "g0": {
+     "type": "NAND2X1",
+     "port_directions": {
+      "A": "input",
+      "B": "input",
+      "Y": "output"
+     },
+     "connections": {
+      "A": [
+       10
+      ],
+      "B": [
+       12
+      ],
+      "Y": [
+       16
+      ]
+     }
+    },
+    "f1": {
+     "type": "DFFX1",
+     "port_directions": {
+      "CK": "input",
+      "D": "input",
+      "RB": "input",
+      "Q": "output"
+     },
+     "connections": {
+      "CK": [
+       8
+      ],
+      "D": [
+       17
+      ],
+      "RB": [
+       9
+      ],
+      "Q": [
+       12
+      ]
+     }
+    },
+    "g1": {
+     "type": "NAND2X1",
+     "port_directions": {
+      "A": "input",
+      "B": "input",
+      "Y": "output"
+     },
+     "connections": {
+      "A": [
+       10
+      ],
+      "B": [
+       18
+      ],
+      "Y": [
+       17
+      ]
+     }
+    },
+    "f2": {
+     "type": "DFFX1",
+     "port_directions": {
+      "CK": "input",
+      "D": "input",
+      "RB": "input",
+      "Q": "output"
+     },
+     "connections": {
+      "CK": [
+       8
+      ],
+      "D": [
+       19
+      ],
+      "RB": [
+       9
+      ],
+      "Q": [
+       18
+      ]
+     }
+    },
+    "g2": {
+     "type": "NAND2X1",
+     "port_directions": {
+      "A": "input",
+      "B": "input",
+      "Y": "output"
+     },
+     "connections": {
+      "A": [
+       10
+      ],
+      "B": [
+       20
+      ],
+      "Y": [
+       19
+      ]
+     }
+    },
+    "f3": {
+     "type": "DFFX1",
+     "port_directions": {
+      "CK": "input",
+      "D": "input",
+      "RB": "input",
+      "Q": "output"
+     },
+     "connections": {
+      "CK": [
+       8
+      ],
+      "D": [
+       21
+      ],
+      "RB": [
+       9
+      ],
+      "Q": [
+       20
+      ]
+     }
+    },
+    "g3": {
+     "type": "NAND2X1",
+     "port_directions": {
+      "A": "input",
+      "B": "input",
+      "Y": "output"
+     },
+     "connections": {
+      "A": [
+       10
+      ],
+      "B": [
+       22
+      ],
+      "Y": [
+       21
+      ]
+     }
+    },
+    "f4": {
+     "type": "DFFX1",
+     "port_directions": {
+      "CK": "input",
+      "D": "input",
+      "RB": "input",
+      "Q": "output"
+     },
+     "connections": {
+      "CK": [
+       8
+      ],
+      "D": [
+       23
+      ],
+      "RB": [
+       9
+      ],
+      "Q": [
+       22
+      ]
+     }
+    },
+    "g4": {
+     "type": "NAND2X1",
+     "port_directions": {
+      "A": "input",
+      "B": "input",
+      "Y": "output"
+     },
+     "connections": {
+      "A": [
+       10
+      ],
+      "B": [
+       24
+      ],
+      "Y": [
+       23
+      ]
+     }
+    },
+    "f5": {
+     "type": "DFFX1",
+     "port_directions": {
+      "CK": "input",
+      "D": "input",
+      "RB": "input",
+      "Q": "output"
+     },
+     "connections": {
+      "CK": [
+       8
+      ],
+      "D": [
+       25
+      ],
+      "RB": [
+       9
+      ],
+      "Q": [
+       24
+      ]
+     }
+    },
+    "g5": {
+     "type": "NAND2X1",
+     "port_directions": {
+      "A": "input",
+      "B": "input",
+      "Y": "output"
+     },
+     "connections": {
+      "A": [
+       10
+      ],
+      "B": [
+       26
+      ],
+      "Y": [
+       25
+      ]
+     }
+    },
+    "f6": {
+     "type": "DFFX1",
+     "port_directions": {
+      "CK": "input",
+      "D": "input",
+      "RB": "input",
+      "Q": "output"
+     },
+     "connections": {
+      "CK": [
+       8
+      ],
+      "D": [
+       27
+      ],
+      "RB": [
+       9
+      ],
+      "Q": [
+       26
+      ]
+     }
+    },
+    "g6": {
+     "type": "NAND2X1",
+     "port_directions": {
+      "A": "input",
+      "B": "input",
+      "Y": "output"
+     },
+     "connections": {
+      "A": [
+       10
+      ],
+      "B": [
+       13
+      ],
+      "Y": [
+       27
+      ]
+     }
+    },
+    "f7": {
+     "type": "DFFX1",
+     "port_directions": {
+      "CK": "input",
+      "D": "input",
+      "RB": "input",
+      "Q": "output"
+     },
+     "connections": {
+      "CK": [
+       8
+      ],
+      "D": [
+       28
+      ],
+      "RB": [
+       9
+      ],
+      "Q": [
+       13
+      ]
+     }
+    },
+    "g7": {
+     "type": "NAND2X1",
+     "port_directions": {
+      "A": "input",
+      "B": "input",
+      "Y": "output"
+     },
+     "connections": {
+      "A": [
+       10
+      ],
+      "B": [
+       11
+      ],
+      "Y": [
+       28
+      ]
+     }
+    }
+   },
+   "netnames": {
+    "clk_i": {
+     "hide_name": 0,
+     "bits": [
+      2
+     ]
+    },
+    "rst_ni": {
+     "hide_name": 0,
+     "bits": [
+      3
+     ]
+    },
+    "a_i": {
+     "hide_name": 0,
+     "bits": [
+      4
+     ]
+    },
+    "b_i": {
+     "hide_name": 0,
+     "bits": [
+      5
+     ]
+    },
+    "q_o": {
+     "hide_name": 0,
+     "bits": [
+      6
+     ]
+    },
+    "en": {
+     "hide_name": 0,
+     "bits": [
+      7
+     ]
+    },
+    "gclk": {
+     "hide_name": 0,
+     "bits": [
+      8
+     ]
+    },
+    "rstn": {
+     "hide_name": 0,
+     "bits": [
+      9
+     ]
+    },
+    "hf": {
+     "hide_name": 0,
+     "bits": [
+      10
+     ]
+    },
+    "q0": {
+     "hide_name": 0,
+     "bits": [
+      11
+     ]
+    },
+    "q1": {
+     "hide_name": 0,
+     "bits": [
+      12
+     ]
+    },
+    "q7": {
+     "hide_name": 0,
+     "bits": [
+      13
+     ]
+    },
+    "r0q": {
+     "hide_name": 0,
+     "bits": [
+      14
+     ]
+    },
+    "r0n": {
+     "hide_name": 0,
+     "bits": [
+      15
+     ]
+    },
+    "d0": {
+     "hide_name": 0,
+     "bits": [
+      16
+     ]
+    },
+    "d1": {
+     "hide_name": 0,
+     "bits": [
+      17
+     ]
+    },
+    "q2": {
+     "hide_name": 0,
+     "bits": [
+      18
+     ]
+    },
+    "d2": {
+     "hide_name": 0,
+     "bits": [
+      19
+     ]
+    },
+    "q3": {
+     "hide_name": 0,
+     "bits": [
+      20
+     ]
+    },
+    "d3": {
+     "hide_name": 0,
+     "bits": [
+      21
+     ]
+    },
+    "q4": {
+     "hide_name": 0,
+     "bits": [
+      22
+     ]
+    },
+    "d4": {
+     "hide_name": 0,
+     "bits": [
+      23
+     ]
+    },
+    "q5": {
+     "hide_name": 0,
+     "bits": [
+      24
+     ]
+    },
+    "d5": {
+     "hide_name": 0,
+     "bits": [
+      25
+     ]
+    },
+    "q6": {
+     "hide_name": 0,
+     "bits": [
+      26
+     ]
+    },
+    "d6": {
+     "hide_name": 0,
+     "bits": [
+      27
+     ]
+    },
+    "d7": {
+     "hide_name": 0,
+     "bits": [
+      28
+     ]
+    }
+   }
+  },
+  "AND2X1": {
+   "attributes": {
+    "blackbox": "1"
+   },
+   "ports": {
+    "A": {
+     "direction": "input",
+     "bits": [
+      2
+     ]
+    },
+    "B": {
+     "direction": "input",
+     "bits": [
+      3
+     ]
+    },
+    "Y": {
+     "direction": "output",
+     "bits": [
+      4
+     ]
+    }
+   },
+   "cells": {},
+   "netnames": {}
+  },
+  "BUFX1": {
+   "attributes": {
+    "blackbox": "1"
+   },
+   "ports": {
+    "A": {
+     "direction": "input",
+     "bits": [
+      2
+     ]
+    },
+    "Y": {
+     "direction": "output",
+     "bits": [
+      3
+     ]
+    }
+   },
+   "cells": {},
+   "netnames": {}
+  },
+  "NAND2X1": {
+   "attributes": {
+    "blackbox": "1"
+   },
+   "ports": {
+    "A": {
+     "direction": "input",
+     "bits": [
+      2
+     ]
+    },
+    "B": {
+     "direction": "input",
+     "bits": [
+      3
+     ]
+    },
+    "Y": {
+     "direction": "output",
+     "bits": [
+      4
+     ]
+    }
+   },
+   "cells": {},
+   "netnames": {}
+  },
+  "INVX1": {
+   "attributes": {
+    "blackbox": "1"
+   },
+   "ports": {
+    "A": {
+     "direction": "input",
+     "bits": [
+      2
+     ]
+    },
+    "Y": {
+     "direction": "output",
+     "bits": [
+      3
+     ]
+    }
+   },
+   "cells": {},
+   "netnames": {}
+  },
+  "BUFX2": {
+   "attributes": {
+    "blackbox": "1"
+   },
+   "ports": {
+    "A": {
+     "direction": "input",
+     "bits": [
+      2
+     ]
+    },
+    "Y": {
+     "direction": "output",
+     "bits": [
+      3
+     ]
+    }
+   },
+   "cells": {},
+   "netnames": {}
+  },
+  "DFFX1": {
+   "attributes": {
+    "blackbox": "1"
+   },
+   "ports": {
+    "CK": {
+     "direction": "input",
+     "bits": [
+      2
+     ]
+    },
+    "D": {
+     "direction": "input",
+     "bits": [
+      3
+     ]
+    },
+    "RB": {
+     "direction": "input",
+     "bits": [
+      4
+     ]
+    },
+    "Q": {
+     "direction": "output",
+     "bits": [
+      5
+     ]
+    }
+   },
+   "cells": {},
+   "netnames": {}
+  }
+ }
+}

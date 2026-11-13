@@ -1,0 +1,67 @@
+{
+ "schema": "rusteda.v1",
+ "ok": true,
+ "command": "ruststa report",
+ "workspace": "@RUN@/frontend/sta-final",
+ "base_rev": null,
+ "rev": "rev2",
+ "new_rev": null,
+ "scope": {
+  "corner": "tt",
+  "wire_model": "spef_rc",
+  "parasitics": "spef",
+  "clock_model": "propagated",
+  "cppr": "off",
+  "corners": [
+   "tt",
+   "ss"
+  ]
+ },
+ "completeness": {
+  "constrained_endpoints": 18,
+  "clock_domains": [
+   "clk_i"
+  ]
+ },
+ "metrics": {
+  "max_transition_violating": 0,
+  "max_capacitance_violating": 0,
+  "max_fanout_violating": 0,
+  "worst_setup_slack_ns": 7.25,
+  "worst_hold_slack_ns": 0.01,
+  "hold_violating_endpoints": 0
+ },
+ "sections": {
+  "drv": {
+   "columns": [
+    "pin",
+    "kind",
+    "net",
+    "value",
+    "limit",
+    "slack"
+   ],
+   "total": 41,
+   "matched": 1,
+   "shown": 1,
+   "rows": [
+    {
+     "pin": "f2/Q",
+     "handle": "pin0",
+     "corner": "tt",
+     "kind": "max_capacitance",
+     "net": "q2",
+     "value": 0.02,
+     "limit": 0.1,
+     "slack": 0.08,
+     "unit": "pf"
+    }
+   ],
+   "stored": 41,
+   "truncated": 0,
+   "unevaluated": 0
+  }
+ },
+ "diagnostics": [],
+ "error": null
+}

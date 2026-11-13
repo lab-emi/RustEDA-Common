@@ -1,0 +1,24 @@
+{
+ "name": "mini",
+ "units_per_micron": 1000,
+ "die_area": {
+  "lx": 0,
+  "ly": 0,
+  "ux": 200000,
+  "uy": 120000
+ },
+ "core_area": {
+  "lx": 10080,
+  "ly": 10080,
+  "ux": 189840,
+  "uy": 110880
+ },
+ "pin_buses": {
+  "RAM8": {
+   "A_DIN": [
+    7,
+    0
+   ]
+  }
+ }
+}

@@ -1,0 +1,227 @@
+{
+  "schema": "rusteda.native-frontend-result.v1",
+  "status": "frontend_completed",
+  "scope": "original RTL, dynamic native ECO, temporary CTS, two placement-estimated RC repair rounds, fresh final one CTS; placement RC estimate, not extraction",
+  "tools": {
+    "rustroad": {
+      "path": "@FIX@/recipe/rustroad",
+      "sha256": "6da9afa7d140f63f4be8e9df65af265f3abd6eeb3189b0c3d1380fdfcd363f4d",
+      "bytes": 56
+    },
+    "xxhsum": {
+      "path": "@XXHSUM@",
+      "sha256": "@SHA:xxhsum@",
+      "bytes": "@BYTES:xxhsum@"
+    }
+  },
+  "original_inputs": {
+    "sdc": {
+      "path": "@FIX@/pdk/constraints.sdc",
+      "sha256": "238233bd27f62c21caa781d0276e0cb50e10e80e82ce5a69eb6c0fdcdddad3d6",
+      "bytes": 1034
+    },
+    "std_tt": {
+      "path": "@FIX@/pdk/std_tt.lib",
+      "sha256": "879716450bc858ab337b03e988cba174bfa08e4bed8bcb5596c12d6920f8c68b",
+      "bytes": 4545
+    },
+    "std_ss": {
+      "path": "@FIX@/pdk/std_ss.lib",
+      "sha256": "148186fa920583ce238d0b27eb62710d465632daa71aeda3159af02a7e55da06",
+      "bytes": 4545
+    },
+    "ram_tt": {
+      "path": "@FIX@/pdk/ram_tt.lib",
+      "sha256": "2684feb78a6e43b6b82cbf2d3b94757f6167029babe48dfa1fd01d4be806c371",
+      "bytes": 114
+    },
+    "ram_ss": {
+      "path": "@FIX@/pdk/ram_ss.lib",
+      "sha256": "2e725ff8822fa9e23854688c96b0686abfdd39da55ec835c4560765ee48933a6",
+      "bytes": 114
+    },
+    "cell_lef": {
+      "path": "@FIX@/pdk/cells.lef",
+      "sha256": "6bac52c45215f8caa3480bb4b60557d1da2dfab609f3aea9aa78ac46c7032fee",
+      "bytes": 7088
+    },
+    "std_lef": {
+      "path": "@FIX@/pdk/cells.lef",
+      "sha256": "6bac52c45215f8caa3480bb4b60557d1da2dfab609f3aea9aa78ac46c7032fee",
+      "bytes": 7088
+    },
+    "floorplan": {
+      "path": "@FIX@/recipe/floorplan.json",
+      "sha256": "7e299fb8736f57d943d05e68f72d834ddd8467489fe1654be6648e6efb2833e6",
+      "bytes": 268
+    },
+    "physical": {
+      "path": "@FIX@/recipe/physical.json",
+      "sha256": "41c480c1f741c3bd52a75a49cda2173112ceb25607c737997a1a34ddd6735bad",
+      "bytes": 462
+    },
+    "routing": {
+      "path": "@FIX@/recipe/routing.json",
+      "sha256": "502a5d4821dcfd0842b3d6488ac2a96db15f836cef4ccd68c314ae2b194e6276",
+      "bytes": 300
+    },
+    "interfaces": {
+      "path": "@FIX@/recipe/interfaces.json",
+      "sha256": "212535f78169567e468db899bc70ad5d060c6ebd800e79171b1d88791c1cca20",
+      "bytes": 72
+    },
+    "ecos": {
+      "path": "@FIX@/recipe/ecos.py",
+      "sha256": "530d6ba13787d5d2fd550acc44afe202b83494ace0e84a2fab85f6918a675c0b",
+      "bytes": 461
+    },
+    "prepare": {
+      "path": "@FIX@/recipe/prepare.py",
+      "sha256": "a8fd65a4586e7300585fc7c3021b1364ebb4206b783f0002b5b946471be14ee7",
+      "bytes": 472
+    },
+    "delay_helper": {
+      "path": "@FIX@/recipe/delay_helper.py",
+      "sha256": "61478a4afebfff1de3df48af08c3837581c7f90819153851fe82d44657551a48",
+      "bytes": 479
+    },
+    "sizing_helper": {
+      "path": "@FIX@/recipe/sizing_helper.py",
+      "sha256": "5feef8908b45bcb5055a0c5bcb8156a93210e44595f3f7d9610aafc7013d9db9",
+      "bytes": 482
+    },
+    "liberty_reader": {
+      "path": "@FIX@/recipe/liberty_lite.py",
+      "sha256": "3be3809a76ef02af2c44ce6e4ae5c919ed63176cbcd78d0a3d909efc6900eb41",
+      "bytes": 474
+    },
+    "estimator": {
+      "path": "@FIX@/recipe/estimator.py",
+      "sha256": "8310d4fff67da0bcb0ed81c994b52d36cae8e86d29dce5783deb3bf8be711172",
+      "bytes": 463
+    },
+    "rc_policy": {
+      "path": "@FIX@/recipe/rc-policy.json",
+      "sha256": "6015f94c359949afc2d3013e5baeda6fbf2da7c045cc82cc8408fc8186421cca",
+      "bytes": 282
+    }
+  },
+  "final_workspace": "@RUN@/frontend/road-final",
+  "final_netlist": {
+    "path": "@RUN@/logs/fe_final_export.stdout",
+    "sha256": "cb0a35939083cc75c8204de9f1f8a7a1dfc9cea7097e72aba422bf63150509ce",
+    "bytes": 1306
+  },
+  "prects_netlist": {
+    "path": "@RUN@/frontend/eco-hold/netlist.v",
+    "sha256": "19f114b387f5b307f31d89200d96b54289828814b8bfecc3e581e04cbc22ef5d",
+    "bytes": 1318
+  },
+  "same_run_seed": {
+    "path": "@RUN@/logs/fe_temporary_seed.stdout",
+    "sha256": "27b10f94b9d19f9c2ef788c310382460199c5f8e14a195c0e73678d12b65b256",
+    "bytes": 253
+  },
+  "pin_plan": {
+    "physical": {
+      "path": "@RUN@/frontend/physical-pins/physical.json",
+      "sha256": "572e6dc62554bf34a986a05d1011793bff3cc00737150a94bff531fa45d8df54",
+      "bytes": 808
+    },
+    "receipt": {
+      "path": "@RUN@/frontend/physical-pins/receipt.json",
+      "sha256": "@SHA:pins-receipt@",
+      "bytes": "@BYTES:pins-receipt@"
+    },
+    "side_counts": [
+      0,
+      0,
+      5,
+      0
+    ]
+  },
+  "seed_source": {
+    "design": "mini",
+    "imported_netlist_sha256": "3a3bfcc84d44481c62b25d517e4a074aac27bb13a11580699c8f0208d153f4c1",
+    "revision": "rev3",
+    "units_per_micron": 1000
+  },
+  "final_estimate": {
+    "result": {
+      "path": "@RUN@/frontend/estimate-final/result.json",
+      "sha256": "b2213100d9dfac9a28dc9d9734930a06361cd67e29b77030471e3dd09a2bb58a",
+      "bytes": 124
+    },
+    "timing": {
+      "tt": {
+        "max_transition_violating": 0,
+        "max_capacitance_violating": 0,
+        "max_fanout_violating": 0,
+        "worst_setup_slack_ns": 7.25,
+        "worst_hold_slack_ns": 0.01,
+        "hold_violating_endpoints": 0
+      },
+      "ss": {
+        "max_transition_violating": 0,
+        "max_capacitance_violating": 0,
+        "max_fanout_violating": 0,
+        "worst_setup_slack_ns": 7.25,
+        "worst_hold_slack_ns": 0.01,
+        "hold_violating_endpoints": 0
+      }
+    }
+  },
+  "plans": {
+    "reset": {
+      "operations": 1,
+      "receipt": {
+        "path": "@RUN@/frontend/eco-reset/receipt.json",
+        "sha256": "96c3b1506afb7c04c19052bbd4e3cac4a43d2594e721dbdcaabd1be348a92a0c",
+        "bytes": 122
+      }
+    },
+    "fanout": {
+      "operations": 4,
+      "receipt": {
+        "path": "@RUN@/frontend/eco-fanout/receipt.json",
+        "sha256": "148f322bc8a28d84e175c67d109ce6effb33953e3f637f800cb72a869bad2008",
+        "bytes": 123
+      }
+    },
+    "primary-clock": {
+      "operations": 7,
+      "receipt": {
+        "path": "@RUN@/frontend/eco-primary-clock/receipt.json",
+        "sha256": "bbca59bcb08a31c2ca50cd383cca99d43a3731909fb98beb1587a46fae8f0270",
+        "bytes": 130
+      }
+    },
+    "electrical": {
+      "operations": 10,
+      "receipt": {
+        "path": "@RUN@/frontend/eco-electrical/receipt.json",
+        "sha256": "a97428c33761b01f22b564c57093791ba76824b4f465cd81fe09bc706eb516bd",
+        "bytes": 124
+      }
+    },
+    "hold": {
+      "operations": 13,
+      "receipt": {
+        "path": "@RUN@/frontend/eco-hold/receipt.json",
+        "sha256": "998ead08e7a38bcdf846a79e537c2daacdd839d66020b9f6b96da36cb88d58db",
+        "bytes": 118
+      }
+    }
+  },
+  "unverified": [
+    "route",
+    "extracted RC",
+    "GDS",
+    "DRC",
+    "antenna",
+    "LVS",
+    "extracted_timing",
+    "CEC",
+    "benchmark"
+  ]
+}

@@ -1,0 +1,161 @@
+library (mini_ss) {
+  time_unit : "1ns" ;
+  capacitive_load_unit (1, pf) ;
+  lu_table_template (T3) {
+    variable_1 : input_net_transition ;
+    variable_2 : total_output_net_capacitance ;
+    index_1 ("0.05, 0.2, 0.8") ;
+    index_2 ("0.001, 0.01, 0.1") ;
+  }
+  cell (BUFX1) {
+    area : 5.6448 ;
+    pin (A) {
+      direction : input ;
+      capacitance : 0.001425 ;
+    }
+    pin (Y) {
+      direction : output ;
+      function : "A" ;
+      max_capacitance : 0.1 ;
+      timing () {
+        related_pin : "A" ;
+        timing_sense : positive_unate ;
+        cell_rise (T3) {
+          values ("0.112504, 0.117040, 0.162400", \
+            "0.210504, 0.215040, 0.260400", \
+            "0.308504, 0.313040, 0.358400") ;
+        }
+        cell_fall (T3) {
+          values ("0.106904, 0.111440, 0.156800", \
+            "0.204904, 0.209440, 0.254800", \
+            "0.302904, 0.307440, 0.352800") ;
+        }
+        rise_transition (T3) {
+          values ("0.098756, 0.105560, 0.173600", \
+            "0.196756, 0.203560, 0.271600", \
+            "0.294756, 0.301560, 0.369600") ;
+        }
+        fall_transition (T3) {
+          values ("0.084756, 0.091560, 0.159600", \
+            "0.182756, 0.189560, 0.257600", \
+            "0.280756, 0.287560, 0.355600") ;
+        }
+      }
+    }
+  }
+  cell (BUFX2) {
+    area : 7.0560 ;
+    pin (A) {
+      direction : input ;
+      capacitance : 0.001900 ;
+    }
+    pin (Y) {
+      direction : output ;
+      function : "A" ;
+      max_capacitance : 0.2 ;
+      timing () {
+        related_pin : "A" ;
+        timing_sense : positive_unate ;
+        cell_rise (T3) {
+          values ("0.112504, 0.117040, 0.162400", \
+            "0.210504, 0.215040, 0.260400", \
+            "0.308504, 0.313040, 0.358400") ;
+        }
+        cell_fall (T3) {
+          values ("0.106904, 0.111440, 0.156800", \
+            "0.204904, 0.209440, 0.254800", \
+            "0.302904, 0.307440, 0.352800") ;
+        }
+        rise_transition (T3) {
+          values ("0.098756, 0.105560, 0.173600", \
+            "0.196756, 0.203560, 0.271600", \
+            "0.294756, 0.301560, 0.369600") ;
+        }
+        fall_transition (T3) {
+          values ("0.084756, 0.091560, 0.159600", \
+            "0.182756, 0.189560, 0.257600", \
+            "0.280756, 0.287560, 0.355600") ;
+        }
+      }
+    }
+  }
+  cell (BUFX4) {
+    area : 9.8784 ;
+    pin (A) {
+      direction : input ;
+      capacitance : 0.003800 ;
+    }
+    pin (Y) {
+      direction : output ;
+      function : "A" ;
+      max_capacitance : 0.4 ;
+      timing () {
+        related_pin : "A" ;
+        timing_sense : positive_unate ;
+        cell_rise (T3) {
+          values ("0.112504, 0.117040, 0.162400", \
+            "0.210504, 0.215040, 0.260400", \
+            "0.308504, 0.313040, 0.358400") ;
+        }
+        cell_fall (T3) {
+          values ("0.106904, 0.111440, 0.156800", \
+            "0.204904, 0.209440, 0.254800", \
+            "0.302904, 0.307440, 0.352800") ;
+        }
+        rise_transition (T3) {
+          values ("0.098756, 0.105560, 0.173600", \
+            "0.196756, 0.203560, 0.271600", \
+            "0.294756, 0.301560, 0.369600") ;
+        }
+        fall_transition (T3) {
+          values ("0.084756, 0.091560, 0.159600", \
+            "0.182756, 0.189560, 0.257600", \
+            "0.280756, 0.287560, 0.355600") ;
+        }
+      }
+    }
+  }
+  cell (DLY1X2) {
+    area : 11.2896 ;
+    pin (A) {
+      direction : input ;
+      capacitance : 0.001710 ;
+    }
+    pin (Y) {
+      direction : output ;
+      function : "A" ;
+      max_capacitance : 0.15 ;
+      timing () {
+        related_pin : "A" ;
+        timing_sense : positive_unate ;
+        cell_rise (T3) {
+          values ("0.420504, 0.425040, 0.470400", \
+            "0.518504, 0.523040, 0.568400", \
+            "0.616504, 0.621040, 0.666400") ;
+        }
+        cell_fall (T3) {
+          values ("0.399504, 0.404040, 0.449400", \
+            "0.497504, 0.502040, 0.547400", \
+            "0.595504, 0.600040, 0.645400") ;
+        }
+        rise_transition (T3) {
+          values ("0.098756, 0.105560, 0.173600", \
+            "0.196756, 0.203560, 0.271600", \
+            "0.294756, 0.301560, 0.369600") ;
+        }
+        fall_transition (T3) {
+          values ("0.084756, 0.091560, 0.159600", \
+            "0.182756, 0.189560, 0.257600", \
+            "0.280756, 0.287560, 0.355600") ;
+        }
+      }
+    }
+  }
+  cell (ANTENNA2) {
+    area : 2.8224 ;
+    pin (A) {
+      direction : input ;
+      capacitance : 0.001 ;
+    }
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "top": "mini",
+  "primary_clock": "clk_i",
+  "buffers": [
+    {
+      "cell": "BUFX1",
+      "input": "A",
+      "output": "Y"
+    },
+    {
+      "cell": "BUFX2",
+      "input": "A",
+      "output": "Y"
+    },
+    {
+      "cell": "BUFX4",
+      "input": "A",
+      "output": "Y"
+    }
+  ],
+  "primary_buffer": "BUFX4",
+  "delay_cells": [
+    "DLY1X2"
+  ],
+  "target_fanout": 3,
+  "cap_fraction": 0.8,
+  "hold_margin_ns": 0.075,
+  "setup_margin_ns": 0.05,
+  "port_diode": {
+    "cell": "ANTENNA2",
+    "pin": "A"
+  },
+  "schema": "rusteda.native-eco-policy.v1",
+  "clock_roots": [
+    "clk_i",
+    "gclk"
+  ],
+  "reset": {
+    "pin": "RB",
+    "leaf": "BUFX2",
+    "trunk": "BUFX4",
+    "net": "rstn"
+  },
+  "scope": "estimated_rc",
+  "prefix": "native_hold",
+  "electrical": {
+    "driver_cells": [
+      "BUFX2",
+      "BUFX4"
+    ],
+    "sram_buffer": "BUFX4",
+    "sram_clock_buffer": "BUFX4",
+    "sram_masters": [
+      "RAM8"
+    ],
+    "load_fraction": 0.6,
+    "max_wire_um": 1200,
+    "antenna_cells": [
+      "ANTENNA2"
+    ],
+    "drv_margin": 0.15,
+    "hold_drv_margin": 0.1,
+    "clock_balance": {
+      "cell": "DLY1X2",
+      "max_stages": 32,
+      "margin_ns": 0.1,
+      "wire_pf": 0.002
+    }
+  },
+  "launch_chain_max": 32
+}

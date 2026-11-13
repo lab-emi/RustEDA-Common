@@ -1,0 +1,65 @@
+{
+  "schema": "rustroad.eco-plan.v1",
+  "module": "mini",
+  "operations": [
+    {
+      "op": "buffer_sinks",
+      "cell": "BUFX1",
+      "instance": "native_fanout_1_0_0",
+      "net": "native_fanout_1_0_0_n",
+      "sinks": [
+        {
+          "instance": "g0",
+          "pin": "A"
+        },
+        {
+          "instance": "g1",
+          "pin": "A"
+        },
+        {
+          "instance": "g2",
+          "pin": "A"
+        }
+      ],
+      "ports": []
+    },
+    {
+      "op": "buffer_sinks",
+      "cell": "BUFX1",
+      "instance": "native_fanout_1_0_1",
+      "net": "native_fanout_1_0_1_n",
+      "sinks": [
+        {
+          "instance": "g3",
+          "pin": "A"
+        },
+        {
+          "instance": "g4",
+          "pin": "A"
+        },
+        {
+          "instance": "g5",
+          "pin": "A"
+        }
+      ],
+      "ports": []
+    },
+    {
+      "op": "buffer_sinks",
+      "cell": "BUFX1",
+      "instance": "native_fanout_1_0_2",
+      "net": "native_fanout_1_0_2_n",
+      "sinks": [
+        {
+          "instance": "g6",
+          "pin": "A"
+        },
+        {
+          "instance": "g7",
+          "pin": "A"
+        }
+      ],
+      "ports": []
+    }
+  ]
+}

@@ -1,0 +1,170 @@
+{
+  "schema": "rustroad.sizing-profile.v1",
+  "pdk": "ihp-sg13g2",
+  "library": "ez130_8t",
+  "generator": "@FIX@/recipe/prepare.py",
+  "sources": [
+    {
+      "role": "liberty_tt",
+      "path": "@FIX@/pdk/std_tt.lib",
+      "sha256": "879716450bc858ab337b03e988cba174bfa08e4bed8bcb5596c12d6920f8c68b",
+      "bytes": 4545
+    },
+    {
+      "role": "liberty_ss",
+      "path": "@FIX@/pdk/std_ss.lib",
+      "sha256": "148186fa920583ce238d0b27eb62710d465632daa71aeda3159af02a7e55da06",
+      "bytes": 4545
+    },
+    {
+      "role": "cell_lef",
+      "path": "@FIX@/pdk/cells.lef",
+      "sha256": "6bac52c45215f8caa3480bb4b60557d1da2dfab609f3aea9aa78ac46c7032fee",
+      "bytes": 7088
+    },
+    {
+      "role": "original_cell_lef",
+      "path": "@FIX@/pdk/cells.lef",
+      "sha256": "6bac52c45215f8caa3480bb4b60557d1da2dfab609f3aea9aa78ac46c7032fee",
+      "bytes": 7088
+    }
+  ],
+  "dbu_per_um": 1000,
+  "rule": "original TT/SS identity functions and original LEF geometry",
+  "drive_model": {
+    "input_slew_ns": 0.2,
+    "loads_pf": [
+      0.005,
+      0.05
+    ],
+    "corners": [
+      "tt",
+      "ss"
+    ]
+  },
+  "families": [
+    {
+      "id": "BUFX",
+      "order": "max_capacitance_pf then area_um2",
+      "pins": {
+        "A": "input",
+        "Y": "output"
+      },
+      "functions": {
+        "Y": "A"
+      },
+      "sequential": [],
+      "cells": [
+        {
+          "name": "BUFX1",
+          "width_dbu": 1680,
+          "area_um2": 5.6448,
+          "max_capacitance_pf": 0.1,
+          "drive": {
+            "tt": {
+              "input_cap_pf": {
+                "A": 0.0015
+              },
+              "output_pin": "Y",
+              "delay_ns": [
+                0.1518,
+                0.168
+              ],
+              "slew_ns": [
+                0.1427,
+                0.167
+              ]
+            },
+            "ss": {
+              "input_cap_pf": {
+                "A": 0.001425
+              },
+              "output_pin": "Y",
+              "delay_ns": [
+                0.21252,
+                0.2352
+              ],
+              "slew_ns": [
+                0.19978,
+                0.2338
+              ]
+            }
+          }
+        },
+        {
+          "name": "BUFX2",
+          "width_dbu": 2100,
+          "area_um2": 7.056,
+          "max_capacitance_pf": 0.2,
+          "drive": {
+            "tt": {
+              "input_cap_pf": {
+                "A": 0.002
+              },
+              "output_pin": "Y",
+              "delay_ns": [
+                0.1518,
+                0.168
+              ],
+              "slew_ns": [
+                0.1427,
+                0.167
+              ]
+            },
+            "ss": {
+              "input_cap_pf": {
+                "A": 0.0019
+              },
+              "output_pin": "Y",
+              "delay_ns": [
+                0.21252,
+                0.2352
+              ],
+              "slew_ns": [
+                0.19978,
+                0.2338
+              ]
+            }
+          }
+        },
+        {
+          "name": "BUFX4",
+          "width_dbu": 2940,
+          "area_um2": 9.8784,
+          "max_capacitance_pf": 0.4,
+          "drive": {
+            "tt": {
+              "input_cap_pf": {
+                "A": 0.004
+              },
+              "output_pin": "Y",
+              "delay_ns": [
+                0.1518,
+                0.168
+              ],
+              "slew_ns": [
+                0.1427,
+                0.167
+              ]
+            },
+            "ss": {
+              "input_cap_pf": {
+                "A": 0.0038
+              },
+              "output_pin": "Y",
+              "delay_ns": [
+                0.21252,
+                0.2352
+              ],
+              "slew_ns": [
+                0.19978,
+                0.2338
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "excluded": []
+}

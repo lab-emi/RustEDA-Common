@@ -655,7 +655,7 @@ impl Context {
         for (_, items) in &groups {
             for (name, item) in items {
                 let record = rec(&digests, Path::new(text(item, "path")?))?;
-                need(record == *item, format!("pinned input changed: {name}"))?;
+                need(record.py_eq(item), format!("pinned input changed: {name}"))?;
             }
         }
         let files = at(&doc, "files")?;

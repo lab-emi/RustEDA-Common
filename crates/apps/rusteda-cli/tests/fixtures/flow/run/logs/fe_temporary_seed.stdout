@@ -1,0 +1,10 @@
+{
+  "schema": "rustroad.placement-seed.v1",
+  "source": {
+    "design": "mini",
+    "imported_netlist_sha256": "3a3bfcc84d44481c62b25d517e4a074aac27bb13a11580699c8f0208d153f4c1",
+    "revision": "rev3",
+    "units_per_micron": 1000
+  },
+  "cells": {}
+}

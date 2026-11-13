@@ -1,0 +1,7 @@
+library (ram_ss) {
+  time_unit : "1ns" ;
+  capacitive_load_unit (1, pf) ;
+  cell (RAM8) {
+    area : 2400 ;
+  }
+}

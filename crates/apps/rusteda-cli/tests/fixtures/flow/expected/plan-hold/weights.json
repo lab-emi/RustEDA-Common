@@ -1,0 +1,13 @@
+{
+ "schema": "rustroad.net-weights.v1",
+ "source": {
+  "operation": "hold",
+  "rule": "repair buffers stay on their short electrical side",
+  "carried": 1
+ },
+ "weights": {
+  "en": 16000,
+  "hf": 16000,
+  "q1": 16000
+ }
+}

@@ -1,0 +1,11 @@
+{
+ "schema": "rustroad.net-weights.v1",
+ "source": {
+  "operation": "electrical",
+  "carried": 0
+ },
+ "weights": {
+  "hf": 16000,
+  "en": 16000
+ }
+}

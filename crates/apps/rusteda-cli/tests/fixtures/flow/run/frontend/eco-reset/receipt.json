@@ -1,0 +1,6 @@
+{
+  "schema": "rusteda.native-eco-receipt.v1",
+  "operation": "reset",
+  "operations": 1,
+  "scope": "ideal_diagnostic"
+}

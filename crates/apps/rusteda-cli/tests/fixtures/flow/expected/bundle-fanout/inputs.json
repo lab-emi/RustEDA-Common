@@ -1,0 +1,128 @@
+{
+  "schema": "rusteda.native-eco-inputs.v1",
+  "netlist": {
+    "path": "@RUN@/frontend/mini.v",
+    "sha256": "3a3bfcc84d44481c62b25d517e4a074aac27bb13a11580699c8f0208d153f4c1",
+    "bytes": 1307
+  },
+  "netlist_json": {
+    "path": "@RUN@/frontend/mini-graph.json",
+    "sha256": "3b0040005f90a420f28d82e09324c1e5e1515a0fb703242f05f50a6e579d1ce8",
+    "bytes": 10621,
+    "source_sha256": "3a3bfcc84d44481c62b25d517e4a074aac27bb13a11580699c8f0208d153f4c1"
+  },
+  "sdc": {
+    "path": "@FIX@/pdk/constraints.sdc",
+    "sha256": "238233bd27f62c21caa781d0276e0cb50e10e80e82ce5a69eb6c0fdcdddad3d6",
+    "bytes": 1034
+  },
+  "io": {
+    "path": "@RUN@/frontend/profiles/io.json",
+    "sha256": "8dc07fe381121453b344c955ff8aaad37ae930344849d32ff7f5e6d46403e069",
+    "bytes": 389
+  },
+  "profiles": {
+    "delay": {
+      "path": "@RUN@/frontend/profiles/delay.json",
+      "sha256": "86325d4e56677abd47d4f7e0e24c31bb4327686399c368736ac4091734093610",
+      "bytes": 58
+    },
+    "lef": {
+      "path": "@FIX@/pdk/cells.lef",
+      "sha256": "6bac52c45215f8caa3480bb4b60557d1da2dfab609f3aea9aa78ac46c7032fee",
+      "bytes": 7088
+    },
+    "sizing": {
+      "path": "@RUN@/frontend/profiles/sizing.json",
+      "sha256": "020b05f1f4b21faf47a3fc055f6a35d435e38db55442f8cc1e46ec21b71c0eb6",
+      "bytes": 59
+    },
+    "cell_buses": {
+      "path": "@RUN@/frontend/profiles/cell-buses.json",
+      "sha256": "5d43c9f2f7803ab42fca3056837ec50d7e571333d2bcbb6ae243e9c326b4a015",
+      "bytes": 58
+    }
+  },
+  "tools": {
+    "rustroad": {
+      "path": "@FIX@/recipe/rustroad",
+      "sha256": "6da9afa7d140f63f4be8e9df65af265f3abd6eeb3189b0c3d1380fdfcd363f4d",
+      "bytes": 56
+    },
+    "xxhsum": {
+      "path": "@XXHSUM@",
+      "sha256": "@SHA:xxhsum@",
+      "bytes": "@BYTES:xxhsum@"
+    },
+    "liberty_reader": {
+      "path": "@FIX@/recipe/liberty_lite.py",
+      "sha256": "3be3809a76ef02af2c44ce6e4ae5c919ed63176cbcd78d0a3d909efc6900eb41",
+      "bytes": 474
+    }
+  },
+  "corners": {
+    "tt": {
+      "pin_tables": [
+        {
+          "path": "@RUN@/logs/fe_caps_tt_std.stdout",
+          "sha256": "093ba7f848702200dca5daae3ed95a62086a914d346ce3caaface90afbd4454a",
+          "bytes": 793,
+          "library": {
+            "path": "@FIX@/pdk/std_tt.lib",
+            "sha256": "879716450bc858ab337b03e988cba174bfa08e4bed8bcb5596c12d6920f8c68b",
+            "bytes": 4545
+          }
+        },
+        {
+          "path": "@RUN@/logs/fe_caps_tt_ram.stdout",
+          "sha256": "bca9a8a29765728937ea557c071a2c90924841c38d7082cc757fce2b42df35b9",
+          "bytes": 40,
+          "library": {
+            "path": "@FIX@/pdk/ram_tt.lib",
+            "sha256": "2684feb78a6e43b6b82cbf2d3b94757f6167029babe48dfa1fd01d4be806c371",
+            "bytes": 114
+          }
+        }
+      ],
+      "drv": {
+        "path": "@RUN@/logs/fe_ideal_tt_drv.stdout",
+        "sha256": "@SHA:ideal-drv-tt@",
+        "bytes": "@BYTES:ideal-drv-tt@"
+      }
+    },
+    "ss": {
+      "pin_tables": [
+        {
+          "path": "@RUN@/logs/fe_caps_ss_std.stdout",
+          "sha256": "2d124183ee21993e5fbea035e2e8e5c7f0820a8c5562ed2ac12732479d5c8058",
+          "bytes": 811,
+          "library": {
+            "path": "@FIX@/pdk/std_ss.lib",
+            "sha256": "148186fa920583ce238d0b27eb62710d465632daa71aeda3159af02a7e55da06",
+            "bytes": 4545
+          }
+        },
+        {
+          "path": "@RUN@/logs/fe_caps_ss_ram.stdout",
+          "sha256": "bca9a8a29765728937ea557c071a2c90924841c38d7082cc757fce2b42df35b9",
+          "bytes": 40,
+          "library": {
+            "path": "@FIX@/pdk/ram_ss.lib",
+            "sha256": "2e725ff8822fa9e23854688c96b0686abfdd39da55ec835c4560765ee48933a6",
+            "bytes": 114
+          }
+        }
+      ],
+      "drv": {
+        "path": "@RUN@/logs/fe_ideal_ss_drv.stdout",
+        "sha256": "@SHA:ideal-drv-ss@",
+        "bytes": "@BYTES:ideal-drv-ss@"
+      }
+    }
+  },
+  "timed_netlist": {
+    "path": "@RUN@/logs/fe_ideal_export.stdout",
+    "sha256": "dcc699eeec2d37e20d685f58b45020015b6fe5302692a55fa8c9120a0e56ceb5",
+    "bytes": 1312
+  }
+}

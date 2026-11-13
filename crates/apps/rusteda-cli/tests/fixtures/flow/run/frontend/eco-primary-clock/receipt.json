@@ -1,0 +1,6 @@
+{
+  "schema": "rusteda.native-eco-receipt.v1",
+  "operation": "primary-clock",
+  "operations": 7,
+  "scope": "ideal_diagnostic"
+}

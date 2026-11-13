@@ -1,0 +1,6 @@
+{
+  "schema": "rusteda.native-eco-receipt.v1",
+  "operation": "electrical",
+  "operations": 10,
+  "scope": "estimated_rc"
+}

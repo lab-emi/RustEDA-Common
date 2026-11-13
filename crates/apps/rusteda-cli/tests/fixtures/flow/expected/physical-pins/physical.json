@@ -1,0 +1,52 @@
+{
+  "power_net": "VPWR",
+  "io_layer": "Metal3",
+  "filler_cells": [
+    "FILL0",
+    "FILL1",
+    "FILL2",
+    "FILL3",
+    "FILL4",
+    "FILL5",
+    "FILL6",
+    "FILL7",
+    "FILL8"
+  ],
+  "io_width": 300,
+  "io_spacing": 840,
+  "tap": {
+    "cell": "WELLTAP",
+    "max_gap": 42000,
+    "pattern": {
+      "kind": "staggered",
+      "phase": 21000,
+      "unpaired": "cell_top"
+    },
+    "body_view": "gds"
+  },
+  "clock": {
+    "port": "clk_i",
+    "root_net": "gclk",
+    "cell": "BUFX4",
+    "max_fanout": 8
+  },
+  "io_plan": {
+    "west": [],
+    "east": [],
+    "south": [
+      "a_i",
+      "b_i",
+      "clk_i",
+      "rst_ni",
+      "q_o"
+    ],
+    "north": [],
+    "targets": {
+      "a_i": 33420,
+      "b_i": 33420,
+      "clk_i": 39510,
+      "rst_ni": 44655,
+      "q_o": 53370
+    }
+  }
+}

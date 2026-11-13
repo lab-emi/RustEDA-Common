@@ -1,0 +1,152 @@
+{
+ "schema": "rusteda.v1",
+ "ok": true,
+ "command": "ruststa report",
+ "workspace": "@RUN@/frontend/sta-est",
+ "base_rev": null,
+ "rev": "rev2",
+ "new_rev": null,
+ "scope": {
+  "corner": "ss",
+  "wire_model": "spef_rc",
+  "parasitics": "spef",
+  "clock_model": "propagated",
+  "cppr": "off",
+  "corners": [
+   "tt",
+   "ss"
+  ]
+ },
+ "completeness": {
+  "constrained_endpoints": 18,
+  "clock_domains": [
+   "clk_i"
+  ]
+ },
+ "metrics": {
+  "worst_setup_slack_ns": 5.5
+ },
+ "sections": {
+  "endpoints": {
+   "columns": [
+    "endpoint",
+    "kind"
+   ],
+   "total": 18,
+   "matched": 18,
+   "shown": 18,
+   "rows": [
+    {
+     "endpoint": "f0/D",
+     "kind": "flip_flop",
+     "setup_slack_ns": 7.25,
+     "hold_slack_ns": 0.44999999999999996
+    },
+    {
+     "endpoint": "f0/RB",
+     "kind": "async_recovery_removal",
+     "setup_slack_ns": 8.5,
+     "hold_slack_ns": 0.9
+    },
+    {
+     "endpoint": "f1/D",
+     "kind": "flip_flop",
+     "setup_slack_ns": 8.25,
+     "hold_slack_ns": 0.44999999999999996
+    },
+    {
+     "endpoint": "f1/RB",
+     "kind": "async_recovery_removal",
+     "setup_slack_ns": 8.5,
+     "hold_slack_ns": 0.9
+    },
+    {
+     "endpoint": "f2/D",
+     "kind": "flip_flop",
+     "setup_slack_ns": 9.25,
+     "hold_slack_ns": 0.44999999999999996
+    },
+    {
+     "endpoint": "f2/RB",
+     "kind": "async_recovery_removal",
+     "setup_slack_ns": 8.5,
+     "hold_slack_ns": 0.9
+    },
+    {
+     "endpoint": "f3/D",
+     "kind": "flip_flop",
+     "setup_slack_ns": 10.25,
+     "hold_slack_ns": 0.44999999999999996
+    },
+    {
+     "endpoint": "f3/RB",
+     "kind": "async_recovery_removal",
+     "setup_slack_ns": 8.5,
+     "hold_slack_ns": 0.9
+    },
+    {
+     "endpoint": "f4/D",
+     "kind": "flip_flop",
+     "setup_slack_ns": 11.25,
+     "hold_slack_ns": 0.44999999999999996
+    },
+    {
+     "endpoint": "f4/RB",
+     "kind": "async_recovery_removal",
+     "setup_slack_ns": 8.5,
+     "hold_slack_ns": 0.9
+    },
+    {
+     "endpoint": "f5/D",
+     "kind": "flip_flop",
+     "setup_slack_ns": 12.25,
+     "hold_slack_ns": 0.44999999999999996
+    },
+    {
+     "endpoint": "f5/RB",
+     "kind": "async_recovery_removal",
+     "setup_slack_ns": 8.5,
+     "hold_slack_ns": 0.9
+    },
+    {
+     "endpoint": "f6/D",
+     "kind": "flip_flop",
+     "setup_slack_ns": 13.25,
+     "hold_slack_ns": 0.44999999999999996
+    },
+    {
+     "endpoint": "f6/RB",
+     "kind": "async_recovery_removal",
+     "setup_slack_ns": 8.5,
+     "hold_slack_ns": 0.9
+    },
+    {
+     "endpoint": "f7/D",
+     "kind": "flip_flop",
+     "setup_slack_ns": 14.25,
+     "hold_slack_ns": 0.44999999999999996
+    },
+    {
+     "endpoint": "f7/RB",
+     "kind": "async_recovery_removal",
+     "setup_slack_ns": 8.5,
+     "hold_slack_ns": 0.9
+    },
+    {
+     "endpoint": "r0/D",
+     "kind": "flip_flop",
+     "setup_slack_ns": 6.0,
+     "hold_slack_ns": 1.6500000000000001
+    },
+    {
+     "endpoint": "q_o",
+     "kind": "output_port",
+     "setup_slack_ns": 5.5,
+     "hold_slack_ns": null
+    }
+   ]
+  }
+ },
+ "diagnostics": [],
+ "error": null
+}

@@ -1,0 +1,6 @@
+{
+  "schema": "rusteda.native-eco-receipt.v1",
+  "operation": "fanout",
+  "operations": 4,
+  "scope": "ideal_diagnostic"
+}

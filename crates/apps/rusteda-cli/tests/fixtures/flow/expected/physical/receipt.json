@@ -1,0 +1,37 @@
+{
+  "inputs": {
+    "physical": {
+      "path": "@FIX@/recipe/physical.json",
+      "sha256": "41c480c1f741c3bd52a75a49cda2173112ceb25607c737997a1a34ddd6735bad",
+      "bytes": 462
+    },
+    "floorplan": {
+      "path": "@FIX@/recipe/floorplan.json",
+      "sha256": "7e299fb8736f57d943d05e68f72d834ddd8467489fe1654be6648e6efb2833e6",
+      "bytes": 268
+    },
+    "routing": {
+      "path": "@FIX@/recipe/routing.json",
+      "sha256": "502a5d4821dcfd0842b3d6488ac2a96db15f836cef4ccd68c314ae2b194e6276",
+      "bytes": 300
+    }
+  },
+  "roots": {
+    "path": "@RUN@/frontend/bundle-reset/roots.json",
+    "sha256": "@SHA:roots@",
+    "bytes": "@BYTES:roots@"
+  },
+  "scope": "route policy prepared, route not executed",
+  "routing_capture": {
+    "template": "{output}/backend/route-budget-error.json",
+    "snapshot_path": "@RUN@/backend/route-budget-error.json",
+    "max_bytes": 536870912,
+    "phase": "post_budget_error",
+    "scope": "failure diagnostic only; no route or signoff pass",
+    "materialized_routing": {
+      "path": "@RUN@/frontend/physical/routing.json",
+      "sha256": "@SHA:routing@",
+      "bytes": "@BYTES:routing@"
+    }
+  }
+}

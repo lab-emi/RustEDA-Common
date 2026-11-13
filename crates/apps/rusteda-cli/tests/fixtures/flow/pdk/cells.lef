@@ -1,0 +1,411 @@
+VERSION 5.8 ;
+BUSBITCHARS "[]" ;
+DIVIDERCHAR "/" ;
+
+MACRO BUFX1
+  CLASS CORE ;
+  ORIGIN 0 0 ;
+  SIZE 1.68 BY 3.36 ;
+  SITE CoreSite ;
+  PIN A
+    DIRECTION INPUT ;
+    USE SIGNAL ;
+    ANTENNAMODEL OXIDE1 ;
+      ANTENNAGATEAREA 0.1014 LAYER Metal1 ;
+    PORT
+      LAYER Metal1 ;
+        RECT 0.130 1.2 0.290 1.8 ;
+    END
+  END A
+  PIN Y
+    DIRECTION OUTPUT ;
+    USE SIGNAL ;
+    ANTENNADIFFAREA 0.2652 LAYER Metal1 ;
+    PORT
+      LAYER Metal1 ;
+        RECT 1.390 1.2 1.550 1.8 ;
+    END
+  END Y
+  PIN VDD
+    DIRECTION INOUT ;
+    USE POWER ;
+    PORT
+      LAYER Metal1 ;
+        RECT 0 3.2 1.68 3.52 ;
+    END
+  END VDD
+  PIN VSS
+    DIRECTION INOUT ;
+    USE GROUND ;
+    PORT
+      LAYER Metal1 ;
+        RECT 0 -0.16 1.68 0.16 ;
+    END
+  END VSS
+END BUFX1
+
+MACRO BUFX2
+  CLASS CORE ;
+  ORIGIN 0 0 ;
+  SIZE 2.1 BY 3.36 ;
+  SITE CoreSite ;
+  PIN A
+    DIRECTION INPUT ;
+    USE SIGNAL ;
+    ANTENNAMODEL OXIDE1 ;
+      ANTENNAGATEAREA 0.1014 LAYER Metal1 ;
+    PORT
+      LAYER Metal1 ;
+        RECT 0.130 1.2 0.290 1.8 ;
+    END
+  END A
+  PIN Y
+    DIRECTION OUTPUT ;
+    USE SIGNAL ;
+    ANTENNADIFFAREA 0.2652 LAYER Metal1 ;
+    PORT
+      LAYER Metal1 ;
+        RECT 1.810 1.2 1.970 1.8 ;
+    END
+  END Y
+  PIN VDD
+    DIRECTION INOUT ;
+    USE POWER ;
+    PORT
+      LAYER Metal1 ;
+        RECT 0 3.2 2.1 3.52 ;
+    END
+  END VDD
+  PIN VSS
+    DIRECTION INOUT ;
+    USE GROUND ;
+    PORT
+      LAYER Metal1 ;
+        RECT 0 -0.16 2.1 0.16 ;
+    END
+  END VSS
+END BUFX2
+
+MACRO BUFX4
+  CLASS CORE ;
+  ORIGIN 0 0 ;
+  SIZE 2.94 BY 3.36 ;
+  SITE CoreSite ;
+  PIN A
+    DIRECTION INPUT ;
+    USE SIGNAL ;
+    ANTENNAMODEL OXIDE1 ;
+      ANTENNAGATEAREA 0.1014 LAYER Metal1 ;
+    PORT
+      LAYER Metal1 ;
+        RECT 0.130 1.2 0.290 1.8 ;
+    END
+  END A
+  PIN Y
+    DIRECTION OUTPUT ;
+    USE SIGNAL ;
+    ANTENNADIFFAREA 0.2652 LAYER Metal1 ;
+    PORT
+      LAYER Metal1 ;
+        RECT 2.650 1.2 2.810 1.8 ;
+    END
+  END Y
+  PIN VDD
+    DIRECTION INOUT ;
+    USE POWER ;
+    PORT
+      LAYER Metal1 ;
+        RECT 0 3.2 2.94 3.52 ;
+    END
+  END VDD
+  PIN VSS
+    DIRECTION INOUT ;
+    USE GROUND ;
+    PORT
+      LAYER Metal1 ;
+        RECT 0 -0.16 2.94 0.16 ;
+    END
+  END VSS
+END BUFX4
+
+MACRO DLY1X2
+  CLASS CORE ;
+  ORIGIN 0 0 ;
+  SIZE 3.36 BY 3.36 ;
+  SITE CoreSite ;
+  PIN A
+    DIRECTION INPUT ;
+    USE SIGNAL ;
+    ANTENNAMODEL OXIDE1 ;
+      ANTENNAGATEAREA 0.1014 LAYER Metal1 ;
+    PORT
+      LAYER Metal1 ;
+        RECT 0.130 1.2 0.290 1.8 ;
+    END
+  END A
+  PIN Y
+    DIRECTION OUTPUT ;
+    USE SIGNAL ;
+    ANTENNADIFFAREA 0.2652 LAYER Metal1 ;
+    PORT
+      LAYER Metal1 ;
+        RECT 3.070 1.2 3.230 1.8 ;
+    END
+  END Y
+  PIN VDD
+    DIRECTION INOUT ;
+    USE POWER ;
+    PORT
+      LAYER Metal1 ;
+        RECT 0 3.2 3.36 3.52 ;
+    END
+  END VDD
+  PIN VSS
+    DIRECTION INOUT ;
+    USE GROUND ;
+    PORT
+      LAYER Metal1 ;
+        RECT 0 -0.16 3.36 0.16 ;
+    END
+  END VSS
+END DLY1X2
+
+MACRO INVX1
+  CLASS CORE ;
+  ORIGIN 0 0 ;
+  SIZE 1.26 BY 3.36 ;
+  SITE CoreSite ;
+  PIN A
+    DIRECTION INPUT ;
+    USE SIGNAL ;
+    ANTENNAMODEL OXIDE1 ;
+      ANTENNAGATEAREA 0.1014 LAYER Metal1 ;
+    PORT
+      LAYER Metal1 ;
+        RECT 0.130 1.2 0.290 1.8 ;
+    END
+  END A
+  PIN Y
+    DIRECTION OUTPUT ;
+    USE SIGNAL ;
+    ANTENNADIFFAREA 0.2652 LAYER Metal1 ;
+    PORT
+      LAYER Metal1 ;
+        RECT 0.970 1.2 1.130 1.8 ;
+    END
+  END Y
+  PIN VDD
+    DIRECTION INOUT ;
+    USE POWER ;
+    PORT
+      LAYER Metal1 ;
+        RECT 0 3.2 1.26 3.52 ;
+    END
+  END VDD
+  PIN VSS
+    DIRECTION INOUT ;
+    USE GROUND ;
+    PORT
+      LAYER Metal1 ;
+        RECT 0 -0.16 1.26 0.16 ;
+    END
+  END VSS
+END INVX1
+
+MACRO NAND2X1
+  CLASS CORE ;
+  ORIGIN 0 0 ;
+  SIZE 1.68 BY 3.36 ;
+  SITE CoreSite ;
+  PIN A
+    DIRECTION INPUT ;
+    USE SIGNAL ;
+    ANTENNAMODEL OXIDE1 ;
+      ANTENNAGATEAREA 0.1014 LAYER Metal1 ;
+    PORT
+      LAYER Metal1 ;
+        RECT 0.130 1.2 0.290 1.8 ;
+    END
+  END A
+  PIN B
+    DIRECTION INPUT ;
+    USE SIGNAL ;
+    ANTENNAMODEL OXIDE1 ;
+      ANTENNAGATEAREA 0.1014 LAYER Metal1 ;
+    PORT
+      LAYER Metal1 ;
+        RECT 0.760 1.2 0.920 1.8 ;
+    END
+  END B
+  PIN Y
+    DIRECTION OUTPUT ;
+    USE SIGNAL ;
+    ANTENNADIFFAREA 0.2652 LAYER Metal1 ;
+    PORT
+      LAYER Metal1 ;
+        RECT 1.390 1.2 1.550 1.8 ;
+    END
+  END Y
+  PIN VDD
+    DIRECTION INOUT ;
+    USE POWER ;
+    PORT
+      LAYER Metal1 ;
+        RECT 0 3.2 1.68 3.52 ;
+    END
+  END VDD
+  PIN VSS
+    DIRECTION INOUT ;
+    USE GROUND ;
+    PORT
+      LAYER Metal1 ;
+        RECT 0 -0.16 1.68 0.16 ;
+    END
+  END VSS
+END NAND2X1
+
+MACRO AND2X1
+  CLASS CORE ;
+  ORIGIN 0 0 ;
+  SIZE 2.1 BY 3.36 ;
+  SITE CoreSite ;
+  PIN A
+    DIRECTION INPUT ;
+    USE SIGNAL ;
+    ANTENNAMODEL OXIDE1 ;
+      ANTENNAGATEAREA 0.1014 LAYER Metal1 ;
+    PORT
+      LAYER Metal1 ;
+        RECT 0.130 1.2 0.290 1.8 ;
+    END
+  END A
+  PIN B
+    DIRECTION INPUT ;
+    USE SIGNAL ;
+    ANTENNAMODEL OXIDE1 ;
+      ANTENNAGATEAREA 0.1014 LAYER Metal1 ;
+    PORT
+      LAYER Metal1 ;
+        RECT 0.970 1.2 1.130 1.8 ;
+    END
+  END B
+  PIN Y
+    DIRECTION OUTPUT ;
+    USE SIGNAL ;
+    ANTENNADIFFAREA 0.2652 LAYER Metal1 ;
+    PORT
+      LAYER Metal1 ;
+        RECT 1.810 1.2 1.970 1.8 ;
+    END
+  END Y
+  PIN VDD
+    DIRECTION INOUT ;
+    USE POWER ;
+    PORT
+      LAYER Metal1 ;
+        RECT 0 3.2 2.1 3.52 ;
+    END
+  END VDD
+  PIN VSS
+    DIRECTION INOUT ;
+    USE GROUND ;
+    PORT
+      LAYER Metal1 ;
+        RECT 0 -0.16 2.1 0.16 ;
+    END
+  END VSS
+END AND2X1
+
+MACRO DFFX1
+  CLASS CORE ;
+  ORIGIN 0 0 ;
+  SIZE 6.3 BY 3.36 ;
+  SITE CoreSite ;
+  PIN CK
+    DIRECTION INPUT ;
+    USE SIGNAL ;
+    ANTENNAMODEL OXIDE1 ;
+      ANTENNAGATEAREA 0.1014 LAYER Metal1 ;
+    PORT
+      LAYER Metal1 ;
+        RECT 0.130 1.2 0.290 1.8 ;
+    END
+  END CK
+  PIN D
+    DIRECTION INPUT ;
+    USE SIGNAL ;
+    ANTENNAMODEL OXIDE1 ;
+      ANTENNAGATEAREA 0.1014 LAYER Metal1 ;
+    PORT
+      LAYER Metal1 ;
+        RECT 2.090 1.2 2.250 1.8 ;
+    END
+  END D
+  PIN RB
+    DIRECTION INPUT ;
+    USE SIGNAL ;
+    ANTENNAMODEL OXIDE1 ;
+      ANTENNAGATEAREA 0.1014 LAYER Metal1 ;
+    PORT
+      LAYER Metal1 ;
+        RECT 4.050 1.2 4.210 1.8 ;
+    END
+  END RB
+  PIN Q
+    DIRECTION OUTPUT ;
+    USE SIGNAL ;
+    ANTENNADIFFAREA 0.2652 LAYER Metal1 ;
+    PORT
+      LAYER Metal1 ;
+        RECT 6.010 1.2 6.170 1.8 ;
+    END
+  END Q
+  PIN VDD
+    DIRECTION INOUT ;
+    USE POWER ;
+    PORT
+      LAYER Metal1 ;
+        RECT 0 3.2 6.3 3.52 ;
+    END
+  END VDD
+  PIN VSS
+    DIRECTION INOUT ;
+    USE GROUND ;
+    PORT
+      LAYER Metal1 ;
+        RECT 0 -0.16 6.3 0.16 ;
+    END
+  END VSS
+END DFFX1
+
+MACRO ANTENNA2
+  CLASS CORE ANTENNACELL ;
+  ORIGIN 0 0 ;
+  SIZE 0.84 BY 3.36 ;
+  SITE CoreSite ;
+  PIN A
+    DIRECTION INPUT ;
+    USE SIGNAL ;
+    ANTENNADIFFAREA 0.5292 LAYER Metal1 ;
+    PORT
+      LAYER Metal1 ;
+        RECT 0.3 1.2 0.5 1.8 ;
+    END
+  END A
+END ANTENNA2
+
+MACRO RAM8
+  CLASS BLOCK ;
+  ORIGIN 0 0 ;
+  SIZE 60 BY 40 ;
+  PIN A_DIN
+    DIRECTION INPUT ;
+    USE SIGNAL ;
+    PORT
+      LAYER Metal2 ;
+        RECT 10 0 10.4 0.4 ;
+    END
+  END A_DIN
+END RAM8
+
+END LIBRARY

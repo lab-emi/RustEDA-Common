@@ -1,0 +1,21 @@
+{
+  "clock_root": "gclk",
+  "reset_root": "rstn",
+  "clock_driver": {
+    "instance": "gate",
+    "cell": "AND2X1",
+    "pin": "Y"
+  },
+  "reset_driver": {
+    "instance": "rbuf",
+    "cell": "BUFX1",
+    "pin": "Y"
+  },
+  "clock_sinks": 8,
+  "reset_sinks": 8,
+  "sdc": {
+    "path": "@FIX@/pdk/constraints.sdc",
+    "sha256": "238233bd27f62c21caa781d0276e0cb50e10e80e82ce5a69eb6c0fdcdddad3d6",
+    "bytes": 1034
+  }
+}

@@ -1,0 +1,235 @@
+{
+  "schema": "rustroad.delay-cells.v1",
+  "pdk": "ihp-sg13g2",
+  "library": "ez130_8t",
+  "generator": "@FIX@/recipe/prepare.py",
+  "sources": [
+    {
+      "role": "liberty_tt",
+      "path": "@FIX@/pdk/std_tt.lib",
+      "sha256": "879716450bc858ab337b03e988cba174bfa08e4bed8bcb5596c12d6920f8c68b",
+      "bytes": 4545
+    },
+    {
+      "role": "liberty_ss",
+      "path": "@FIX@/pdk/std_ss.lib",
+      "sha256": "148186fa920583ce238d0b27eb62710d465632daa71aeda3159af02a7e55da06",
+      "bytes": 4545
+    },
+    {
+      "role": "cell_lef",
+      "path": "@FIX@/pdk/cells.lef",
+      "sha256": "6bac52c45215f8caa3480bb4b60557d1da2dfab609f3aea9aa78ac46c7032fee",
+      "bytes": 7088
+    },
+    {
+      "role": "original_cell_lef",
+      "path": "@FIX@/pdk/cells.lef",
+      "sha256": "6bac52c45215f8caa3480bb4b60557d1da2dfab609f3aea9aa78ac46c7032fee",
+      "bytes": 7088
+    }
+  ],
+  "cell_policy": {
+    "path": "@RUN@/frontend/profiles-out/cell-policy.json",
+    "sha256": "491a2a49c43a874cf5c89dc50e71642f62ec3beeb76530bed5d8f3a6dc5270cd"
+  },
+  "corners": [
+    {
+      "name": "tt",
+      "liberty": "std_tt",
+      "rc": "nom"
+    },
+    {
+      "name": "ss",
+      "liberty": "std_ss",
+      "rc": "nom"
+    }
+  ],
+  "representative": {
+    "input_slew_ns": 0.2,
+    "load_pf": 0.01,
+    "reason": "diagnostic estimate; re-time every ECO at both corners"
+  },
+  "selection": {
+    "allowed": [
+      "BUFX1",
+      "BUFX2",
+      "BUFX4",
+      "DLY1X2"
+    ],
+    "corners": [
+      "tt",
+      "ss"
+    ],
+    "purpose": "identity buffer/delay flow policy from original PDK"
+  },
+  "buffers": [
+    {
+      "name": "BUFX1",
+      "input_pin": "A",
+      "output_pin": "Y",
+      "function": "A",
+      "function_check": "identity in original TT/SS Liberty",
+      "timing_sense": "positive_unate",
+      "area_um2": 5.6448,
+      "lef_size_um": [
+        1.68,
+        3.36
+      ],
+      "policy_class": "cts_hold",
+      "input_cap_pf": {
+        "tt": 0.0015,
+        "ss": 0.001425
+      },
+      "delay_ns": {
+        "tt": {
+          "rise": 0.1536,
+          "fall": 0.1496
+        },
+        "ss": {
+          "rise": 0.21504,
+          "fall": 0.20944
+        }
+      },
+      "output_slew_ns": {
+        "tt": {
+          "rise": 0.1454,
+          "fall": 0.1354
+        },
+        "ss": {
+          "rise": 0.20356,
+          "fall": 0.18956
+        }
+      }
+    },
+    {
+      "name": "BUFX2",
+      "input_pin": "A",
+      "output_pin": "Y",
+      "function": "A",
+      "function_check": "identity in original TT/SS Liberty",
+      "timing_sense": "positive_unate",
+      "area_um2": 7.056,
+      "lef_size_um": [
+        2.1,
+        3.36
+      ],
+      "policy_class": "cts_hold",
+      "input_cap_pf": {
+        "tt": 0.002,
+        "ss": 0.0019
+      },
+      "delay_ns": {
+        "tt": {
+          "rise": 0.1536,
+          "fall": 0.1496
+        },
+        "ss": {
+          "rise": 0.21504,
+          "fall": 0.20944
+        }
+      },
+      "output_slew_ns": {
+        "tt": {
+          "rise": 0.1454,
+          "fall": 0.1354
+        },
+        "ss": {
+          "rise": 0.20356,
+          "fall": 0.18956
+        }
+      }
+    },
+    {
+      "name": "BUFX4",
+      "input_pin": "A",
+      "output_pin": "Y",
+      "function": "A",
+      "function_check": "identity in original TT/SS Liberty",
+      "timing_sense": "positive_unate",
+      "area_um2": 9.8784,
+      "lef_size_um": [
+        2.94,
+        3.36
+      ],
+      "policy_class": "cts_hold",
+      "input_cap_pf": {
+        "tt": 0.004,
+        "ss": 0.0038
+      },
+      "delay_ns": {
+        "tt": {
+          "rise": 0.1536,
+          "fall": 0.1496
+        },
+        "ss": {
+          "rise": 0.21504,
+          "fall": 0.20944
+        }
+      },
+      "output_slew_ns": {
+        "tt": {
+          "rise": 0.1454,
+          "fall": 0.1354
+        },
+        "ss": {
+          "rise": 0.20356,
+          "fall": 0.18956
+        }
+      }
+    },
+    {
+      "name": "DLY1X2",
+      "input_pin": "A",
+      "output_pin": "Y",
+      "function": "A",
+      "function_check": "identity in original TT/SS Liberty",
+      "timing_sense": "positive_unate",
+      "area_um2": 11.2896,
+      "lef_size_um": [
+        3.36,
+        3.36
+      ],
+      "policy_class": "cts_hold",
+      "input_cap_pf": {
+        "tt": 0.0018,
+        "ss": 0.00171
+      },
+      "delay_ns": {
+        "tt": {
+          "rise": 0.3736,
+          "fall": 0.3586
+        },
+        "ss": {
+          "rise": 0.52304,
+          "fall": 0.50204
+        }
+      },
+      "output_slew_ns": {
+        "tt": {
+          "rise": 0.1454,
+          "fall": 0.1354
+        },
+        "ss": {
+          "rise": 0.20356,
+          "fall": 0.18956
+        }
+      }
+    }
+  ],
+  "antenna_cells": [
+    {
+      "name": "ANTENNA2",
+      "pin": "A",
+      "area_um2": 2.8224,
+      "lef_size_um": [
+        0.84,
+        3.36
+      ],
+      "lef_diff_area_um2": 0.5292,
+      "lef_gate_area_um2": 0.0,
+      "policy_class": "physical_only"
+    }
+  ],
+  "excluded": []
+}

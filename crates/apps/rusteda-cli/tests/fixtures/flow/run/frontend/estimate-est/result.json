@@ -1,0 +1,11 @@
+{
+  "schema": "rusteda.rc-estimate-result.v1",
+  "inputs": {
+    "def": {
+      "sha256": "b994213597a291f3f306db32a8baf89817d944cfcbc576b16527b18ecfb94b8c"
+    },
+    "policy": {
+      "sha256": "6015f94c359949afc2d3013e5baeda6fbf2da7c045cc82cc8408fc8186421cca"
+    }
+  }
+}

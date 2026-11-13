@@ -1,0 +1,24 @@
+{
+  "sdc_sha256": "238233bd27f62c21caa781d0276e0cb50e10e80e82ce5a69eb6c0fdcdddad3d6",
+  "drivers": {
+    "clk_i": {
+      "cell": "BUFX4",
+      "pin": "Y"
+    },
+    "rst_ni": {
+      "cell": "BUFX4",
+      "pin": "Y"
+    },
+    "a_i": {
+      "cell": "BUFX4",
+      "pin": "Y"
+    },
+    "b_i": {
+      "cell": "BUFX4",
+      "pin": "Y"
+    }
+  },
+  "loads_pf": {
+    "q_o": 0.006
+  }
+}

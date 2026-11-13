@@ -1,0 +1,161 @@
+{
+  "schema": "rustroad.eco-plan.v1",
+  "module": "mini",
+  "operations": [
+    {
+      "op": "buffer_sinks",
+      "cell": "BUFX2",
+      "instance": "native_hold_0",
+      "net": "native_hold_0_n",
+      "sinks": [
+        {
+          "instance": "g0",
+          "pin": "A"
+        },
+        {
+          "instance": "g1",
+          "pin": "A"
+        },
+        {
+          "instance": "g2",
+          "pin": "A"
+        },
+        {
+          "instance": "g3",
+          "pin": "A"
+        },
+        {
+          "instance": "g4",
+          "pin": "A"
+        },
+        {
+          "instance": "g5",
+          "pin": "A"
+        },
+        {
+          "instance": "g6",
+          "pin": "A"
+        },
+        {
+          "instance": "g7",
+          "pin": "A"
+        }
+      ],
+      "ports": []
+    },
+    {
+      "op": "buffer_sinks",
+      "cell": "BUFX2",
+      "instance": "native_hold_1",
+      "net": "native_hold_1_n",
+      "sinks": [
+        {
+          "instance": "u_o",
+          "pin": "A"
+        },
+        {
+          "instance": "g0",
+          "pin": "B"
+        }
+      ],
+      "ports": []
+    },
+    {
+      "op": "buffer_sinks",
+      "cell": "DLY1X2",
+      "instance": "native_hold_launch_0_0",
+      "net": "native_hold_launch_0_0_n",
+      "sinks": [
+        {
+          "instance": "u_hf",
+          "pin": "A"
+        }
+      ],
+      "ports": []
+    },
+    {
+      "op": "insert_buffer",
+      "cell": "DLY1X2",
+      "instance": "native_hold_0000_0",
+      "net": "native_hold_0000_0_n",
+      "sink": {
+        "instance": "f0",
+        "pin": "D"
+      }
+    },
+    {
+      "op": "insert_buffer",
+      "cell": "DLY1X2",
+      "instance": "native_hold_0001_0",
+      "net": "native_hold_0001_0_n",
+      "sink": {
+        "instance": "f3",
+        "pin": "D"
+      }
+    },
+    {
+      "op": "insert_buffer",
+      "cell": "DLY1X2",
+      "instance": "native_hold_0002_0",
+      "net": "native_hold_0002_0_n",
+      "sink": {
+        "instance": "f6",
+        "pin": "D"
+      }
+    },
+    {
+      "op": "insert_buffer",
+      "cell": "DLY1X2",
+      "instance": "native_hold_0002_1",
+      "net": "native_hold_0002_1_n",
+      "sink": {
+        "instance": "f6",
+        "pin": "D"
+      }
+    },
+    {
+      "op": "insert_buffer",
+      "cell": "DLY1X2",
+      "instance": "native_hold_0003_0",
+      "net": "native_hold_0003_0_n",
+      "sink": {
+        "instance": "f7",
+        "pin": "D"
+      }
+    },
+    {
+      "op": "insert_buffer",
+      "cell": "DLY1X2",
+      "instance": "native_hold_0003_1",
+      "net": "native_hold_0003_1_n",
+      "sink": {
+        "instance": "f7",
+        "pin": "D"
+      }
+    },
+    {
+      "op": "insert_diode",
+      "cell": "ANTENNA2",
+      "instance": "native_hold_port_diode_0",
+      "net": "clk_i"
+    },
+    {
+      "op": "insert_diode",
+      "cell": "ANTENNA2",
+      "instance": "native_hold_port_diode_1",
+      "net": "rst_ni"
+    },
+    {
+      "op": "insert_diode",
+      "cell": "ANTENNA2",
+      "instance": "native_hold_port_diode_2",
+      "net": "a_i"
+    },
+    {
+      "op": "insert_diode",
+      "cell": "ANTENNA2",
+      "instance": "native_hold_port_diode_3",
+      "net": "b_i"
+    }
+  ]
+}

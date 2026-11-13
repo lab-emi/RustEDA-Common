@@ -1,0 +1,554 @@
+{
+ "schema": "rusteda.v1",
+ "ok": true,
+ "command": "ruststa report",
+ "workspace": "@RUN@/frontend/sta-est",
+ "base_rev": null,
+ "rev": "rev2",
+ "new_rev": null,
+ "scope": {
+  "corner": "tt",
+  "wire_model": "spef_rc",
+  "parasitics": "spef",
+  "clock_model": "propagated",
+  "cppr": "off",
+  "corners": [
+   "tt",
+   "ss"
+  ]
+ },
+ "completeness": {
+  "constrained_endpoints": 18,
+  "clock_domains": [
+   "clk_i"
+  ]
+ },
+ "metrics": {
+  "worst_hold_slack_ns": -0.02
+ },
+ "sections": {
+  "hold_fix": {
+   "target_margin_ns": 0.5,
+   "corners": [
+    {
+     "corner": "tt",
+     "hold_endpoints": 18,
+     "hold_violating": 1,
+     "listed": 5,
+     "shown": 5,
+     "endpoints": [
+      {
+       "endpoint": "f6/D",
+       "handle": "pin1",
+       "inst": "f6",
+       "cell": "DFFX1",
+       "capture_clock": "clk_i",
+       "hold_slack_ns": -0.02,
+       "required_delay_ns": 0.52,
+       "setup_slack_ns": 8.0,
+       "net": "d6",
+       "net_driver": "g6/Y",
+       "net_fanout": 1,
+       "startpoint": "a_i",
+       "path": {
+        "handle": "path1",
+        "startpoint": "a_i",
+        "slack_ns": -0.02,
+        "stages": [
+         {
+          "pin": "a_i",
+          "arc": "launch",
+          "net": "a_i",
+          "incr_ns": 2.0
+         },
+         {
+          "pin": "u_hf/Y",
+          "arc": "cell",
+          "net": "hf",
+          "incr_ns": 0.21
+         },
+         {
+          "pin": "g6/Y",
+          "arc": "cell",
+          "net": "d6",
+          "incr_ns": 0.12
+         },
+         {
+          "pin": "f6/D",
+          "arc": "net",
+          "net": "d6",
+          "incr_ns": 0.0001
+         }
+        ]
+       }
+      },
+      {
+       "endpoint": "f3/D",
+       "handle": "pin1",
+       "inst": "f3",
+       "cell": "DFFX1",
+       "capture_clock": "clk_i",
+       "hold_slack_ns": 0.01,
+       "required_delay_ns": 0.49,
+       "setup_slack_ns": 8.0,
+       "net": "d3",
+       "net_driver": "g3/Y",
+       "net_fanout": 1,
+       "startpoint": "f4/CK",
+       "path": {
+        "handle": "path1",
+        "startpoint": "f4/CK",
+        "slack_ns": 0.01,
+        "stages": [
+         {
+          "pin": "f4/CK",
+          "arc": "launch",
+          "net": "gclk",
+          "incr_ns": 0.9
+         },
+         {
+          "pin": "f4/Q",
+          "arc": "cell",
+          "net": "q4",
+          "incr_ns": 0.35
+         },
+         {
+          "pin": "g3/Y",
+          "arc": "cell",
+          "net": "d3",
+          "incr_ns": 0.12
+         },
+         {
+          "pin": "f3/D",
+          "arc": "net",
+          "net": "d3",
+          "incr_ns": 0.0001
+         }
+        ]
+       }
+      },
+      {
+       "endpoint": "f7/D",
+       "handle": "pin1",
+       "inst": "f7",
+       "cell": "DFFX1",
+       "capture_clock": "clk_i",
+       "hold_slack_ns": 0.03,
+       "required_delay_ns": 0.47,
+       "setup_slack_ns": 8.0,
+       "net": "d7",
+       "net_driver": "g7/Y",
+       "net_fanout": 1,
+       "startpoint": "a_i",
+       "path": {
+        "handle": "path1",
+        "startpoint": "a_i",
+        "slack_ns": 0.03,
+        "stages": [
+         {
+          "pin": "a_i",
+          "arc": "launch",
+          "net": "a_i",
+          "incr_ns": 2.0
+         },
+         {
+          "pin": "u_hf/Y",
+          "arc": "cell",
+          "net": "hf",
+          "incr_ns": 0.21
+         },
+         {
+          "pin": "g7/Y",
+          "arc": "cell",
+          "net": "d7",
+          "incr_ns": 0.12
+         },
+         {
+          "pin": "f7/D",
+          "arc": "net",
+          "net": "d7",
+          "incr_ns": 0.0001
+         }
+        ]
+       }
+      },
+      {
+       "endpoint": "f0/D",
+       "handle": "pin1",
+       "inst": "f0",
+       "cell": "DFFX1",
+       "capture_clock": "clk_i",
+       "hold_slack_ns": 0.05,
+       "required_delay_ns": 0.45,
+       "setup_slack_ns": 8.0,
+       "net": "d0",
+       "net_driver": "g0/Y",
+       "net_fanout": 1,
+       "startpoint": "r0/CK",
+       "path": {
+        "handle": "path1",
+        "startpoint": "r0/CK",
+        "slack_ns": 0.05,
+        "stages": [
+         {
+          "pin": "r0/CK",
+          "arc": "launch",
+          "net": "clk_i",
+          "incr_ns": 0.9
+         },
+         {
+          "pin": "r0/Q",
+          "arc": "cell",
+          "net": "r0q",
+          "incr_ns": 0.35
+         },
+         {
+          "pin": "g0/Y",
+          "arc": "cell",
+          "net": "d0",
+          "incr_ns": 0.12
+         },
+         {
+          "pin": "f0/D",
+          "arc": "net",
+          "net": "d0",
+          "incr_ns": 0.0001
+         }
+        ]
+       }
+      },
+      {
+       "endpoint": "f5/D",
+       "handle": "pin1",
+       "inst": "f5",
+       "cell": "DFFX1",
+       "capture_clock": "clk_i",
+       "hold_slack_ns": 0.2,
+       "required_delay_ns": 0.3,
+       "setup_slack_ns": 8.0,
+       "net": "d5",
+       "net_driver": "g5/Y",
+       "net_fanout": 1,
+       "startpoint": "f6/CK",
+       "path": {
+        "handle": "path1",
+        "startpoint": "f6/CK",
+        "slack_ns": 0.2,
+        "stages": [
+         {
+          "pin": "f6/CK",
+          "arc": "launch",
+          "net": "gclk",
+          "incr_ns": 0.9
+         },
+         {
+          "pin": "f6/Q",
+          "arc": "cell",
+          "net": "q6",
+          "incr_ns": 0.35
+         },
+         {
+          "pin": "g5/Y",
+          "arc": "cell",
+          "net": "d5",
+          "incr_ns": 0.12
+         },
+         {
+          "pin": "f5/D",
+          "arc": "net",
+          "net": "d5",
+          "incr_ns": 0.0001
+         }
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "corner": "ss",
+     "hold_endpoints": 18,
+     "hold_violating": 0,
+     "listed": 5,
+     "shown": 5,
+     "endpoints": [
+      {
+       "endpoint": "f6/D",
+       "handle": "pin1",
+       "inst": "f6",
+       "cell": "DFFX1",
+       "capture_clock": "clk_i",
+       "hold_slack_ns": 0.04,
+       "required_delay_ns": 0.46,
+       "setup_slack_ns": 8.0,
+       "net": "d6",
+       "net_driver": "g6/Y",
+       "net_fanout": 1,
+       "startpoint": "a_i",
+       "path": {
+        "handle": "path1",
+        "startpoint": "a_i",
+        "slack_ns": 0.04,
+        "stages": [
+         {
+          "pin": "a_i",
+          "arc": "launch",
+          "net": "a_i",
+          "incr_ns": 2.0
+         },
+         {
+          "pin": "u_hf/Y",
+          "arc": "cell",
+          "net": "hf",
+          "incr_ns": 0.21
+         },
+         {
+          "pin": "g6/Y",
+          "arc": "cell",
+          "net": "d6",
+          "incr_ns": 0.12
+         },
+         {
+          "pin": "f6/D",
+          "arc": "net",
+          "net": "d6",
+          "incr_ns": 0.0001
+         }
+        ]
+       }
+      },
+      {
+       "endpoint": "f3/D",
+       "handle": "pin1",
+       "inst": "f3",
+       "cell": "DFFX1",
+       "capture_clock": "clk_i",
+       "hold_slack_ns": 0.06,
+       "required_delay_ns": 0.44,
+       "setup_slack_ns": 8.0,
+       "net": "d3",
+       "net_driver": "g3/Y",
+       "net_fanout": 1,
+       "startpoint": "f4/CK",
+       "path": {
+        "handle": "path1",
+        "startpoint": "f4/CK",
+        "slack_ns": 0.06,
+        "stages": [
+         {
+          "pin": "f4/CK",
+          "arc": "launch",
+          "net": "gclk",
+          "incr_ns": 0.9
+         },
+         {
+          "pin": "f4/Q",
+          "arc": "cell",
+          "net": "q4",
+          "incr_ns": 0.35
+         },
+         {
+          "pin": "g3/Y",
+          "arc": "cell",
+          "net": "d3",
+          "incr_ns": 0.12
+         },
+         {
+          "pin": "f3/D",
+          "arc": "net",
+          "net": "d3",
+          "incr_ns": 0.0001
+         }
+        ]
+       }
+      },
+      {
+       "endpoint": "f7/D",
+       "handle": "pin1",
+       "inst": "f7",
+       "cell": "DFFX1",
+       "capture_clock": "clk_i",
+       "hold_slack_ns": 0.07,
+       "required_delay_ns": 0.43,
+       "setup_slack_ns": 8.0,
+       "net": "d7",
+       "net_driver": "g7/Y",
+       "net_fanout": 1,
+       "startpoint": "a_i",
+       "path": {
+        "handle": "path1",
+        "startpoint": "a_i",
+        "slack_ns": 0.07,
+        "stages": [
+         {
+          "pin": "a_i",
+          "arc": "launch",
+          "net": "a_i",
+          "incr_ns": 2.0
+         },
+         {
+          "pin": "u_hf/Y",
+          "arc": "cell",
+          "net": "hf",
+          "incr_ns": 0.21
+         },
+         {
+          "pin": "g7/Y",
+          "arc": "cell",
+          "net": "d7",
+          "incr_ns": 0.12
+         },
+         {
+          "pin": "f7/D",
+          "arc": "net",
+          "net": "d7",
+          "incr_ns": 0.0001
+         }
+        ]
+       }
+      },
+      {
+       "endpoint": "f0/D",
+       "handle": "pin1",
+       "inst": "f0",
+       "cell": "DFFX1",
+       "capture_clock": "clk_i",
+       "hold_slack_ns": 0.09,
+       "required_delay_ns": 0.41000000000000003,
+       "setup_slack_ns": 8.0,
+       "net": "d0",
+       "net_driver": "g0/Y",
+       "net_fanout": 1,
+       "startpoint": "r0/CK",
+       "path": {
+        "handle": "path1",
+        "startpoint": "r0/CK",
+        "slack_ns": 0.09,
+        "stages": [
+         {
+          "pin": "r0/CK",
+          "arc": "launch",
+          "net": "clk_i",
+          "incr_ns": 0.9
+         },
+         {
+          "pin": "r0/Q",
+          "arc": "cell",
+          "net": "r0q",
+          "incr_ns": 0.35
+         },
+         {
+          "pin": "g0/Y",
+          "arc": "cell",
+          "net": "d0",
+          "incr_ns": 0.12
+         },
+         {
+          "pin": "f0/D",
+          "arc": "net",
+          "net": "d0",
+          "incr_ns": 0.0001
+         }
+        ]
+       }
+      },
+      {
+       "endpoint": "f5/D",
+       "handle": "pin1",
+       "inst": "f5",
+       "cell": "DFFX1",
+       "capture_clock": "clk_i",
+       "hold_slack_ns": 0.3,
+       "required_delay_ns": 0.2,
+       "setup_slack_ns": 8.0,
+       "net": "d5",
+       "net_driver": "g5/Y",
+       "net_fanout": 1,
+       "startpoint": "f6/CK",
+       "path": {
+        "handle": "path1",
+        "startpoint": "f6/CK",
+        "slack_ns": 0.3,
+        "stages": [
+         {
+          "pin": "f6/CK",
+          "arc": "launch",
+          "net": "gclk",
+          "incr_ns": 0.9
+         },
+         {
+          "pin": "f6/Q",
+          "arc": "cell",
+          "net": "q6",
+          "incr_ns": 0.35
+         },
+         {
+          "pin": "g5/Y",
+          "arc": "cell",
+          "net": "d5",
+          "incr_ns": 0.12
+         },
+         {
+          "pin": "f5/D",
+          "arc": "net",
+          "net": "d5",
+          "incr_ns": 0.0001
+         }
+        ]
+       }
+      }
+     ]
+    }
+   ],
+   "merged_total": 5,
+   "merged": [
+    {
+     "endpoint": "f6/D",
+     "handle": "pin1",
+     "worst_hold_slack_ns": -0.02,
+     "hold_slack_by_corner_ns": {
+      "ss": 0.04,
+      "tt": -0.02
+     }
+    },
+    {
+     "endpoint": "f3/D",
+     "handle": "pin1",
+     "worst_hold_slack_ns": 0.01,
+     "hold_slack_by_corner_ns": {
+      "ss": 0.06,
+      "tt": 0.01
+     }
+    },
+    {
+     "endpoint": "f7/D",
+     "handle": "pin1",
+     "worst_hold_slack_ns": 0.03,
+     "hold_slack_by_corner_ns": {
+      "ss": 0.07,
+      "tt": 0.03
+     }
+    },
+    {
+     "endpoint": "f0/D",
+     "handle": "pin1",
+     "worst_hold_slack_ns": 0.05,
+     "hold_slack_by_corner_ns": {
+      "ss": 0.09,
+      "tt": 0.05
+     }
+    },
+    {
+     "endpoint": "f5/D",
+     "handle": "pin1",
+     "worst_hold_slack_ns": 0.2,
+     "hold_slack_by_corner_ns": {
+      "ss": 0.3,
+      "tt": 0.2
+     }
+    }
+   ]
+  }
+ },
+ "diagnostics": [],
+ "error": null
+}

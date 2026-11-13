@@ -1,0 +1,59 @@
+{
+ "schema": "rusteda.revision.v1",
+ "rev": "rev2",
+ "parent": "rev1",
+ "tool": "ruststa",
+ "command": "ruststa run",
+ "libraries": [
+  {
+   "name": "std_tt",
+   "corner": "tt",
+   "hash": "xxh3:0000000000000000",
+   "source": "@FIX@/pdk/std_tt.lib",
+   "compiled": "cache/std_tt-0000000000000000.rlib"
+  },
+  {
+   "name": "ram_tt",
+   "corner": "tt",
+   "hash": "xxh3:0000000000000000",
+   "source": "@FIX@/pdk/ram_tt.lib",
+   "compiled": "cache/ram_tt-0000000000000000.rlib"
+  },
+  {
+   "name": "std_ss",
+   "corner": "ss",
+   "hash": "xxh3:0000000000000000",
+   "source": "@FIX@/pdk/std_ss.lib",
+   "compiled": "cache/std_ss-0000000000000000.rlib"
+  },
+  {
+   "name": "ram_ss",
+   "corner": "ss",
+   "hash": "xxh3:0000000000000000",
+   "source": "@FIX@/pdk/ram_ss.lib",
+   "compiled": "cache/ram_ss-0000000000000000.rlib"
+  }
+ ],
+ "sources": [
+  {
+   "table": "constraints",
+   "path": "@FIX@/pdk/constraints.sdc",
+   "hash": "xxh3:25e68f861f7940ac"
+  },
+  {
+   "table": "netlist",
+   "path": "@RUN@/logs/fe_est_export.stdout",
+   "hash": "xxh3:dd0608630f99f77f"
+  },
+  {
+   "table": "parasitics",
+   "path": "@RUN@/frontend/estimate-est/estimate.spef",
+   "hash": "xxh3:9af5e9b73fe60091"
+  },
+  {
+   "table": "parasitics",
+   "path": "@RUN@/frontend/estimate-est/estimate.spef",
+   "hash": "xxh3:9af5e9b73fe60091"
+  }
+ ]
+}

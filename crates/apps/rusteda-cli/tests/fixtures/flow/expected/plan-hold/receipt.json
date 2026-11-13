@@ -1,0 +1,190 @@
+{
+  "schema": "rusteda.native-eco-receipt.v1",
+  "rev": "rev1",
+  "operation": "hold",
+  "planner_sha256": "@PLANNER@",
+  "status": "planned_unverified",
+  "scope": "estimated_rc",
+  "corner_scopes": {
+    "tt": {
+      "corner": "tt",
+      "wire_model": "spef_rc",
+      "parasitics": "spef",
+      "clock_model": "propagated",
+      "cppr": "off",
+      "corners": [
+        "tt",
+        "ss"
+      ]
+    },
+    "ss": {
+      "corner": "ss",
+      "wire_model": "spef_rc",
+      "parasitics": "spef",
+      "clock_model": "propagated",
+      "cppr": "off",
+      "corners": [
+        "tt",
+        "ss"
+      ]
+    }
+  },
+  "inputs": {
+    "@RUN@/frontend/bundle-hold/inputs.json": "@SHA:hold-inputs@",
+    "@RUN@/frontend/bundle-hold/policy.json": "ba7a1bf9a9edd878cd90541bc779fb8a9f692b80e2351cf87cae219f0027a1e3",
+    "@RUN@/frontend/mini.v": "3a3bfcc84d44481c62b25d517e4a074aac27bb13a11580699c8f0208d153f4c1",
+    "@RUN@/logs/fe_est_export.stdout": "3948a76e532d2d8a01b9b91ecfc80ae2c32ce186a3996b5324ae5fd144ec47c3",
+    "@FIX@/pdk/constraints.sdc": "238233bd27f62c21caa781d0276e0cb50e10e80e82ce5a69eb6c0fdcdddad3d6",
+    "@RUN@/frontend/mini-graph.json": "3b0040005f90a420f28d82e09324c1e5e1515a0fb703242f05f50a6e579d1ce8",
+    "@RUN@/frontend/profiles/io.json": "8dc07fe381121453b344c955ff8aaad37ae930344849d32ff7f5e6d46403e069",
+    "@RUN@/frontend/profiles/delay.json": "86325d4e56677abd47d4f7e0e24c31bb4327686399c368736ac4091734093610",
+    "@RUN@/frontend/profiles/sizing.json": "020b05f1f4b21faf47a3fc055f6a35d435e38db55442f8cc1e46ec21b71c0eb6",
+    "@RUN@/frontend/profiles/cell-buses.json": "5d43c9f2f7803ab42fca3056837ec50d7e571333d2bcbb6ae243e9c326b4a015",
+    "@FIX@/pdk/std_tt.lib": "879716450bc858ab337b03e988cba174bfa08e4bed8bcb5596c12d6920f8c68b",
+    "@FIX@/pdk/ram_tt.lib": "2684feb78a6e43b6b82cbf2d3b94757f6167029babe48dfa1fd01d4be806c371",
+    "@FIX@/pdk/std_ss.lib": "148186fa920583ce238d0b27eb62710d465632daa71aeda3159af02a7e55da06",
+    "@FIX@/pdk/ram_ss.lib": "2e725ff8822fa9e23854688c96b0686abfdd39da55ec835c4560765ee48933a6",
+    "@RUN@/frontend/eco-electrical/weights.json": "c89211a91184df25af2d5cd1f1c4342cba88a629065253d5be41ac42e84babce",
+    "@FIX@/recipe/rc-policy.json": "6015f94c359949afc2d3013e5baeda6fbf2da7c045cc82cc8408fc8186421cca",
+    "@RUN@/logs/fe_caps_tt_std.stdout": "093ba7f848702200dca5daae3ed95a62086a914d346ce3caaface90afbd4454a",
+    "@RUN@/logs/fe_caps_tt_ram.stdout": "bca9a8a29765728937ea557c071a2c90924841c38d7082cc757fce2b42df35b9",
+    "@RUN@/logs/fe_caps_ss_std.stdout": "2d124183ee21993e5fbea035e2e8e5c7f0820a8c5562ed2ac12732479d5c8058",
+    "@RUN@/logs/fe_caps_ss_ram.stdout": "bca9a8a29765728937ea557c071a2c90924841c38d7082cc757fce2b42df35b9",
+    "@RUN@/logs/fe_est_tt_drv.stdout": "@SHA:est-drv-tt@",
+    "@XXHSUM@": "@SHA:xxhsum@",
+    "@RUN@/frontend/sta-est/cache/std_tt-0000000000000000.lib": "879716450bc858ab337b03e988cba174bfa08e4bed8bcb5596c12d6920f8c68b",
+    "@RUN@/frontend/sta-est/cache/ram_tt-0000000000000000.lib": "2684feb78a6e43b6b82cbf2d3b94757f6167029babe48dfa1fd01d4be806c371",
+    "@RUN@/frontend/estimate-est/estimate.spef": "73548ecbda5c8ea838e3fa45053098f06f4a6f1a1392650c467386c07a552db5",
+    "@RUN@/frontend/sta-est/revisions/rev0002/meta.json": "@SHA:est-meta@",
+    "@RUN@/logs/fe_est_ss_drv.stdout": "@SHA:est-drv-ss@",
+    "@RUN@/frontend/sta-est/cache/std_ss-0000000000000000.lib": "148186fa920583ce238d0b27eb62710d465632daa71aeda3159af02a7e55da06",
+    "@RUN@/frontend/sta-est/cache/ram_ss-0000000000000000.lib": "2e725ff8822fa9e23854688c96b0686abfdd39da55ec835c4560765ee48933a6",
+    "@FIX@/recipe/estimator.py": "8310d4fff67da0bcb0ed81c994b52d36cae8e86d29dce5783deb3bf8be711172",
+    "@FIX@/pdk/cells.lef": "6bac52c45215f8caa3480bb4b60557d1da2dfab609f3aea9aa78ac46c7032fee",
+    "@RUN@/logs/fe_est_def.stdout": "b994213597a291f3f306db32a8baf89817d944cfcbc576b16527b18ecfb94b8c",
+    "@RUN@/logs/fe_est_seed.stdout": "ec1eec3f5d90b3528e0a173a07229beed1495a6e343ae2436c16711b92f3ddf1",
+    "@RUN@/logs/fe_est_hold.stdout": "@SHA:est-hold@",
+    "@RUN@/logs/fe_est_tt_endpoints.stdout": "@SHA:est-endpoints-tt@",
+    "@RUN@/logs/fe_est_ss_endpoints.stdout": "@SHA:est-endpoints-ss@",
+    "@FIX@/recipe/liberty_lite.py": "3be3809a76ef02af2c44ce6e4ae5c919ed63176cbcd78d0a3d909efc6900eb41"
+  },
+  "operations": 13,
+  "checked": [
+    {
+      "net": "hf",
+      "action": "isolate",
+      "driver": "u_hf/Y",
+      "estimated_load_pf": 0.093,
+      "estimated_wire_um": 225.8,
+      "clusters": 1,
+      "trunk_buffers": 0
+    },
+    {
+      "net": "q1",
+      "action": "isolate",
+      "driver": "f1/Q",
+      "estimated_load_pf": 0.104,
+      "estimated_wire_um": 63.8,
+      "clusters": 1,
+      "trunk_buffers": 0
+    },
+    {
+      "startpoint": "a_i",
+      "launch_pin": null,
+      "endpoints": 2,
+      "stages": 1,
+      "cell": "DLY1X2",
+      "inside_tree": false
+    },
+    {
+      "endpoint": "f0/D",
+      "stages": 1,
+      "cell": "DLY1X2"
+    },
+    {
+      "endpoint": "f3/D",
+      "stages": 1,
+      "cell": "DLY1X2"
+    },
+    {
+      "endpoint": "f6/D",
+      "stages": 2,
+      "cell": "DLY1X2"
+    },
+    {
+      "endpoint": "f7/D",
+      "stages": 2,
+      "cell": "DLY1X2"
+    },
+    {
+      "port_diodes": 4,
+      "cell": "ANTENNA2"
+    }
+  ],
+  "excluded": [],
+  "extra": {
+    "electrical_nets": 2,
+    "resized_levels": 0,
+    "cap_feedback_nets": 0,
+    "basis": "placement RC estimate; re-time after placement",
+    "hold": {
+      "basis": "placement RC estimate; table extrema; re-time after placement",
+      "violating": 4,
+      "charged_repairs": 18,
+      "report_margin_ns": 0.5,
+      "launch_groups": 1,
+      "worst_setup_ns": 5.5,
+      "bounds": {
+        "DLY1X2": {
+          "tt": {
+            "min": 0.28536,
+            "max": 0.476,
+            "chain": 0.476,
+            "area": 11.2896
+          },
+          "ss": {
+            "min": 0.399504,
+            "max": 0.6664,
+            "chain": 0.6664,
+            "area": 11.2896
+          }
+        }
+      }
+    },
+    "seed": {
+      "new_cells": 13,
+      "seeded_cells": 36,
+      "clock_sinks": 8,
+      "regrouped_buffers": 2
+    },
+    "weights": {
+      "total": 3,
+      "new": 2
+    }
+  },
+  "budgets": {
+    "memory_mib": 2048,
+    "max_operations": 4096,
+    "max_depth": 8,
+    "max_cells": 100000,
+    "max_connections": 500000,
+    "max_rows": 200000,
+    "max_work": 10000000,
+    "max_combinations": 200000,
+    "max_hold_chain": 4,
+    "max_total_hold_chain": 8,
+    "timeout_seconds": 180
+  },
+  "memory_estimate_bytes": 135470640,
+  "work_units": 337,
+  "elapsed_seconds": "@ELAPSED@",
+  "peak_rss_kib": "@PEAK@",
+  "plan_sha256": "3cb63441094d2b120a611364c9fb2f431e9066909f6497b85a806c1c1b46ab3e",
+  "netlist_sha256": null,
+  "signoff": {
+    "CEC": "unverified",
+    "DRC": "unverified",
+    "LVS": "unverified",
+    "post_edit_timing": "unverified"
+  }
+}

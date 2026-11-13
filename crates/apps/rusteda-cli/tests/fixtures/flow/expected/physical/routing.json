@@ -1,0 +1,16 @@
+{
+  "track_router": {
+    "min_routing_layer": "Metal2",
+    "max_routing_layer": "TopMetal2"
+  },
+  "limits": {
+    "max_axis": 1048576,
+    "replay": {
+      "path": "@RUN@/backend/route-budget-error.json",
+      "net": null,
+      "round": null,
+      "max_bytes": 536870912,
+      "phase": "post_budget_error"
+    }
+  }
+}

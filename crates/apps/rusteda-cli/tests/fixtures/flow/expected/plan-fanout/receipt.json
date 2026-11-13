@@ -1,0 +1,123 @@
+{
+  "schema": "rusteda.native-eco-receipt.v1",
+  "rev": "rev1",
+  "operation": "fanout",
+  "planner_sha256": "@PLANNER@",
+  "status": "planned_unverified",
+  "scope": "ideal_diagnostic",
+  "corner_scopes": {
+    "tt": {
+      "corner": "tt",
+      "wire_model": "ideal",
+      "parasitics": null,
+      "clock_model": "propagated",
+      "cppr": "off",
+      "corners": [
+        "tt",
+        "ss"
+      ]
+    },
+    "ss": {
+      "corner": "ss",
+      "wire_model": "ideal",
+      "parasitics": null,
+      "clock_model": "propagated",
+      "cppr": "off",
+      "corners": [
+        "tt",
+        "ss"
+      ]
+    }
+  },
+  "inputs": {
+    "@RUN@/frontend/bundle-fanout/inputs.json": "@SHA:fanout-inputs@",
+    "@RUN@/frontend/bundle-fanout/policy.json": "e4127eb86c3067e57fcfe52b6d88b090d25a3daa5edd993cfb64fbd11a1180c8",
+    "@RUN@/frontend/mini.v": "3a3bfcc84d44481c62b25d517e4a074aac27bb13a11580699c8f0208d153f4c1",
+    "@RUN@/logs/fe_ideal_export.stdout": "dcc699eeec2d37e20d685f58b45020015b6fe5302692a55fa8c9120a0e56ceb5",
+    "@FIX@/pdk/constraints.sdc": "238233bd27f62c21caa781d0276e0cb50e10e80e82ce5a69eb6c0fdcdddad3d6",
+    "@RUN@/frontend/mini-graph.json": "3b0040005f90a420f28d82e09324c1e5e1515a0fb703242f05f50a6e579d1ce8",
+    "@RUN@/frontend/profiles/io.json": "8dc07fe381121453b344c955ff8aaad37ae930344849d32ff7f5e6d46403e069",
+    "@RUN@/frontend/profiles/delay.json": "86325d4e56677abd47d4f7e0e24c31bb4327686399c368736ac4091734093610",
+    "@RUN@/frontend/profiles/sizing.json": "020b05f1f4b21faf47a3fc055f6a35d435e38db55442f8cc1e46ec21b71c0eb6",
+    "@RUN@/frontend/profiles/cell-buses.json": "5d43c9f2f7803ab42fca3056837ec50d7e571333d2bcbb6ae243e9c326b4a015",
+    "@FIX@/pdk/std_tt.lib": "879716450bc858ab337b03e988cba174bfa08e4bed8bcb5596c12d6920f8c68b",
+    "@FIX@/pdk/ram_tt.lib": "2684feb78a6e43b6b82cbf2d3b94757f6167029babe48dfa1fd01d4be806c371",
+    "@FIX@/pdk/std_ss.lib": "148186fa920583ce238d0b27eb62710d465632daa71aeda3159af02a7e55da06",
+    "@FIX@/pdk/ram_ss.lib": "2e725ff8822fa9e23854688c96b0686abfdd39da55ec835c4560765ee48933a6",
+    "@RUN@/logs/fe_caps_tt_std.stdout": "093ba7f848702200dca5daae3ed95a62086a914d346ce3caaface90afbd4454a",
+    "@RUN@/logs/fe_caps_tt_ram.stdout": "bca9a8a29765728937ea557c071a2c90924841c38d7082cc757fce2b42df35b9",
+    "@RUN@/logs/fe_caps_ss_std.stdout": "2d124183ee21993e5fbea035e2e8e5c7f0820a8c5562ed2ac12732479d5c8058",
+    "@RUN@/logs/fe_caps_ss_ram.stdout": "bca9a8a29765728937ea557c071a2c90924841c38d7082cc757fce2b42df35b9",
+    "@RUN@/logs/fe_ideal_tt_drv.stdout": "@SHA:ideal-drv-tt@",
+    "@XXHSUM@": "@SHA:xxhsum@",
+    "@RUN@/frontend/sta-ideal/cache/std_tt-0000000000000000.lib": "879716450bc858ab337b03e988cba174bfa08e4bed8bcb5596c12d6920f8c68b",
+    "@RUN@/frontend/sta-ideal/cache/ram_tt-0000000000000000.lib": "2684feb78a6e43b6b82cbf2d3b94757f6167029babe48dfa1fd01d4be806c371",
+    "@RUN@/frontend/sta-ideal/revisions/rev0002/meta.json": "@SHA:ideal-meta@",
+    "@RUN@/logs/fe_ideal_ss_drv.stdout": "@SHA:ideal-drv-ss@",
+    "@RUN@/frontend/sta-ideal/cache/std_ss-0000000000000000.lib": "148186fa920583ce238d0b27eb62710d465632daa71aeda3159af02a7e55da06",
+    "@RUN@/frontend/sta-ideal/cache/ram_ss-0000000000000000.lib": "2e725ff8822fa9e23854688c96b0686abfdd39da55ec835c4560765ee48933a6"
+  },
+  "operations": 3,
+  "checked": [
+    {
+      "instance": "native_fanout_1_0_0",
+      "cell": "BUFX1",
+      "cap_pf": 0.0048000000000000004,
+      "fanout": 3.0,
+      "cap_limit_pf": 0.1
+    },
+    {
+      "instance": "native_fanout_1_0_1",
+      "cell": "BUFX1",
+      "cap_pf": 0.0048000000000000004,
+      "fanout": 3.0,
+      "cap_limit_pf": 0.1
+    },
+    {
+      "instance": "native_fanout_1_0_2",
+      "cell": "BUFX1",
+      "cap_pf": 0.0032,
+      "fanout": 2.0,
+      "cap_limit_pf": 0.1
+    },
+    {
+      "root": "native_fanout_1",
+      "depth": 1,
+      "fanout": 3.0,
+      "cap_pf": 0.0045000000000000005,
+      "cap_limit_pf": 0.1
+    }
+  ],
+  "excluded": [
+    {
+      "net": "gclk",
+      "reason": "explicit clock/CTS scope"
+    }
+  ],
+  "extra": {},
+  "budgets": {
+    "memory_mib": 2048,
+    "max_operations": 4096,
+    "max_depth": 8,
+    "max_cells": 100000,
+    "max_connections": 500000,
+    "max_rows": 200000,
+    "max_work": 10000000,
+    "max_combinations": 200000,
+    "max_hold_chain": 4,
+    "max_total_hold_chain": 8,
+    "timeout_seconds": 180
+  },
+  "memory_estimate_bytes": 135467192,
+  "work_units": 223,
+  "elapsed_seconds": "@ELAPSED@",
+  "peak_rss_kib": "@PEAK@",
+  "plan_sha256": "34a8b9224b0558a5f9927fb3c80d3598cb7fe1233055637657027ff7ac2c8475",
+  "netlist_sha256": null,
+  "signoff": {
+    "CEC": "unverified",
+    "DRC": "unverified",
+    "LVS": "unverified",
+    "post_edit_timing": "unverified"
+  }
+}

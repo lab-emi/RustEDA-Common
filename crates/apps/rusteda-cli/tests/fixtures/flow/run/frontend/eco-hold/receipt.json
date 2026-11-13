@@ -1,0 +1,6 @@
+{
+  "schema": "rusteda.native-eco-receipt.v1",
+  "operation": "hold",
+  "operations": 13,
+  "scope": "estimated_rc"
+}

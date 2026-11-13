@@ -1,0 +1,64 @@
+{
+  "rule": "nearest core side of the load centroid, strongest preference first; along-side target is the centroid; port diodes excluded",
+  "inputs": {
+    "placed_def": {
+      "path": "@RUN@/logs/fe_pins_def.stdout",
+      "sha256": "ea24d796dda29876851e47427d91fb03988edfc7f160baa4cdffe782fc8ccb2c",
+      "bytes": 3167
+    },
+    "physical": {
+      "path": "@RUN@/frontend/physical/physical.json",
+      "sha256": "305c314bc42ef31a88de400a8259c941f66e7a385bb1131eb633f69288799aea",
+      "bytes": 521
+    },
+    "cell_lef": {
+      "path": "@FIX@/pdk/cells.lef",
+      "sha256": "6bac52c45215f8caa3480bb4b60557d1da2dfab609f3aea9aa78ac46c7032fee",
+      "bytes": 7088
+    },
+    "floorplan": {
+      "path": "@FIX@/recipe/floorplan.json",
+      "sha256": "7e299fb8736f57d943d05e68f72d834ddd8467489fe1654be6648e6efb2833e6",
+      "bytes": 268
+    }
+  },
+  "side_counts": [
+    0,
+    0,
+    5,
+    0
+  ],
+  "pins": [
+    {
+      "pin": "a_i",
+      "side": "south",
+      "target_dbu": 33420,
+      "loads": 1
+    },
+    {
+      "pin": "b_i",
+      "side": "south",
+      "target_dbu": 33420,
+      "loads": 1
+    },
+    {
+      "pin": "clk_i",
+      "side": "south",
+      "target_dbu": 39510,
+      "loads": 2
+    },
+    {
+      "pin": "rst_ni",
+      "side": "south",
+      "target_dbu": 44655,
+      "loads": 2
+    },
+    {
+      "pin": "q_o",
+      "side": "south",
+      "target_dbu": 53370,
+      "loads": 1
+    }
+  ],
+  "scope": "pin plan from the pin-planning placement; the temporary, repair and final rounds import it"
+}

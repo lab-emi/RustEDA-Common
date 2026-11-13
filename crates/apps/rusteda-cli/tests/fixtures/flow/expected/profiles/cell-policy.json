@@ -1,0 +1,13 @@
+{
+  "allowed": [
+    "BUFX1",
+    "BUFX2",
+    "BUFX4",
+    "DLY1X2"
+  ],
+  "corners": [
+    "tt",
+    "ss"
+  ],
+  "purpose": "identity buffer/delay flow policy from original PDK"
+}
