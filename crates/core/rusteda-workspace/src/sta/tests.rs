@@ -681,7 +681,7 @@ fn downgraded_to_v1(raw: &[u8]) -> Vec<u8> {
     let mut secs = sections_of(raw);
     let eps = std::mem::take(bytes(&mut secs, section::ENDPOINTS));
     let mut v1 = Vec::new();
-    for r in eps.chunks_exact(36) {
+    for r in eps.as_chunks::<36>().0 {
         let mut rec = r[..32].to_vec();
         let flags = get_u32(&rec, 20) | (get_u32(r, 32) << 10);
         set_u32(&mut rec, 20, flags);
@@ -690,7 +690,7 @@ fn downgraded_to_v1(raw: &[u8]) -> Vec<u8> {
     *secs.get_mut(&section::ENDPOINTS).unwrap() = (32, v1);
     let ranks = std::mem::take(bytes(&mut secs, section::PATH_RANK));
     let mut v1 = Vec::new();
-    for r in ranks.chunks_exact(12) {
+    for r in ranks.as_chunks::<12>().0 {
         let ep = get_u32(r, 4);
         v1.extend_from_slice(&r[..4]);
         v1.extend_from_slice(&((ep & 0xFFFF) as u16).to_le_bytes());
@@ -700,17 +700,25 @@ fn downgraded_to_v1(raw: &[u8]) -> Vec<u8> {
     *secs.get_mut(&section::PATH_RANK).unwrap() = (8, v1);
     let ptr = std::mem::take(bytes(&mut secs, section::PATH_CHAIN_PTR));
     let chain = std::mem::take(bytes(&mut secs, section::PATH_CHAIN));
-    let words = |b: &[u8]| -> Vec<u32> { b.chunks_exact(4).map(|w| get_u32(w, 0)).collect() };
+    let words = |b: &[u8]| -> Vec<u32> {
+        b.as_chunks::<4>()
+            .0
+            .iter()
+            .map(|w| u32::from_le_bytes(*w))
+            .collect()
+    };
     let ptr: Vec<u32> = ptr
-        .chunks_exact(8)
-        .map(|w| u32::try_from(u64::from_le_bytes(w.try_into().unwrap())).unwrap())
+        .as_chunks::<8>()
+        .0
+        .iter()
+        .map(|w| u32::try_from(u64::from_le_bytes(*w)).unwrap())
         .collect();
     let chain = words(&chain);
     let (mut new_ptr, mut new_chain) = (vec![0u32], Vec::new());
     for row in ptr.windows(2) {
         let w = &chain[row[0] as usize..row[1] as usize];
         new_chain.extend_from_slice(&w[..CHAIN_HEADER_WORDS]);
-        for st in w[CHAIN_HEADER_WORDS..].chunks_exact(3) {
+        for st in w[CHAIN_HEADER_WORDS..].as_chunks::<3>().0 {
             new_chain
                 .push((st[0] & 0x00FF_FFFF) | ((st[1] & 1) << 24) | (((st[1] >> 1) & 3) << 25));
             new_chain.push(st[2]);

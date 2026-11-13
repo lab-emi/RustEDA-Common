@@ -570,7 +570,7 @@ impl StaTable {
     /// needs a name by node, bounded by the buckets.
     fn buckets_by_node(&self, v: &View<'_>) -> HashMap<u32, u32> {
         let mut map = HashMap::new();
-        for (b, words) in v.name_hash.chunks_exact(BUCKET_WORDS).enumerate() {
+        for (b, words) in v.name_hash.as_chunks::<BUCKET_WORDS>().0.iter().enumerate() {
             if words[0] != 0 {
                 map.entry(words[1]).or_insert(b as u32);
             }

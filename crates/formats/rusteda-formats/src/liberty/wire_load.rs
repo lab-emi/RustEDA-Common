@@ -70,7 +70,7 @@ fn fanout_pairs(g: &Group, path: &str, name: &str, diags: &mut Diags) -> Vec<(u3
             });
             continue;
         }
-        for pair in tokens.chunks_exact(2) {
+        for pair in tokens.as_chunks::<2>().0 {
             let (Some(fanout), Some(val)) = (
                 parse_u32(pair[0]),
                 parse_f64(pair[1]).filter(|v| v.is_finite()),

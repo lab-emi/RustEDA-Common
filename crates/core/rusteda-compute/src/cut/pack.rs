@@ -199,11 +199,10 @@ pub(super) fn choice(w: &[u32]) -> Choice {
 }
 
 /// A cut from its `CW` words.
-pub(super) fn row(r: &[u32]) -> CutRow {
-    let mut leaves = [0u32; 6];
-    leaves.copy_from_slice(&r[..6]);
+pub(super) fn row(r: &[u32; CW]) -> CutRow {
+    let [l0, l1, l2, l3, l4, l5, ..] = *r;
     CutRow {
-        leaves,
+        leaves: [l0, l1, l2, l3, l4, l5],
         n: r[6],
         tt: u64::from(r[7]) | (u64::from(r[8]) << 32),
         sign: u64::from(r[9]) | (u64::from(r[10]) << 32),
@@ -225,7 +224,7 @@ pub(super) fn read_into(
     out.choices
         .extend((0..n).map(|id| [choice(&best[6 * id..]), choice(&best[6 * id + 3..])]));
     out.rows.clear();
-    out.rows.extend(rows.chunks_exact(CW).map(row));
+    out.rows.extend(rows.as_chunks::<CW>().0.iter().map(row));
     out.cut_count.clear();
     if let Some(c) = counts {
         out.cut_count.extend_from_slice(c);
