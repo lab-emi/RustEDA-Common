@@ -8,20 +8,14 @@ edition = "2024"
 rust-version = "1.97"
 license = "Apache-2.0"
 publish = false
-authors = ["RustEDA contributors"]
 repository = "https://github.com/lab-emi/RustEDA-Common"
 
 [workspace.dependencies]
 rusteda-core = { path = "crates/core/rusteda-core" }
 rusteda-workspace = { path = "crates/core/rusteda-workspace" }
-rusteda-compute = { path = "crates/core/rusteda-compute" }
 rusteda-formats = { path = "crates/formats/rusteda-formats" }
-rusteda-cli-common = { path = "crates/apps/rusteda-cli" }
 clap = { version = "=4.6.7", default-features = false, features = ["std", "derive", "help", "usage", "error-context", "color", "suggestions"] }
 clap_complete = { version = "=4.6.11", default-features = false }
-# Terminal size for the progress line of the command line. `windows`: crossterm does not compile
-# on Windows without it (its dependencies are Windows-only).
-crossterm = { version = "=0.29.0", default-features = false, features = ["windows"] }
 serde = { version = "=1.0.228", features = ["derive"] }
 # float_roundtrip: the decimal text of a stored f64 parses back to the same value.
 serde_json = { version = "=1.0.149", features = ["float_roundtrip"] }
