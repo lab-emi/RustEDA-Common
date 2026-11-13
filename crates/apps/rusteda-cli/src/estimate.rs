@@ -53,7 +53,7 @@ pub struct EstimateArgs {
 
 /// An estimate failure, reported as the reference reports it.
 #[derive(Debug)]
-struct Fail(String);
+pub(crate) struct Fail(pub(crate) String);
 
 impl From<std::io::Error> for Fail {
     fn from(e: std::io::Error) -> Self {
@@ -61,7 +61,7 @@ impl From<std::io::Error> for Fail {
     }
 }
 
-fn fail<T>(text: impl Into<String>) -> Result<T, Fail> {
+pub(crate) fn fail<T>(text: impl Into<String>) -> Result<T, Fail> {
     Err(Fail(text.into()))
 }
 
@@ -87,7 +87,7 @@ pub fn run(ws: &Path, args: &EstimateArgs) -> ExitCode {
 // ---------------------------------------------------------------------------------------------
 // Text rules of the reference: whitespace is `str.isspace` of ASCII, words are `\w` of ASCII.
 
-fn space(b: u8) -> bool {
+pub(crate) fn space(b: u8) -> bool {
     matches!(b, b' ' | b'\t' | b'\n' | b'\r' | 0x0b | 0x0c | 0x1c..=0x1f)
 }
 
@@ -97,8 +97,12 @@ fn word(b: u8) -> bool {
 
 /// The text of `path` as the reference reads it: UTF-8 (only ASCII is accepted here), with
 /// universal newlines (`\r\n` and `\r` read as `\n`).
-fn read_text(path: &Path) -> Result<String, Fail> {
-    let bytes = fs::read(path)?;
+pub(crate) fn read_text(path: &Path) -> Result<String, Fail> {
+    text_of(fs::read(path)?, path)
+}
+
+/// The text of the bytes of `path` as the reference reads it (see `read_text`).
+pub(crate) fn text_of(bytes: Vec<u8>, path: &Path) -> Result<String, Fail> {
     if !bytes.is_ascii() {
         return fail(format!("{}: non-ASCII input", path.display()));
     }
@@ -111,12 +115,12 @@ fn read_text(path: &Path) -> Result<String, Fail> {
 }
 
 /// The lines of `text` with their `\n`, as iterating a text file yields them.
-fn lines(text: &str) -> impl Iterator<Item = &str> {
+pub(crate) fn lines(text: &str) -> impl Iterator<Item = &str> {
     text.split_inclusive('\n')
 }
 
 /// `s.split()`: the whitespace-separated tokens.
-fn tokens(s: &str) -> Vec<&str> {
+pub(crate) fn tokens(s: &str) -> Vec<&str> {
     s.as_bytes()
         .split(|&b| space(b))
         .filter(|t| !t.is_empty())
@@ -125,19 +129,19 @@ fn tokens(s: &str) -> Vec<&str> {
 }
 
 /// `s.lstrip()`.
-fn lstrip(s: &str) -> &str {
+pub(crate) fn lstrip(s: &str) -> &str {
     let n = s.bytes().take_while(|&b| space(b)).count();
     &s[n..]
 }
 
 /// `float(token)` for the decimal tokens of LEF and DEF.
-fn py_float(t: &str) -> Result<f64, Fail> {
+pub(crate) fn py_float(t: &str) -> Result<f64, Fail> {
     t.parse::<f64>()
         .map_err(|_| Fail(format!("could not convert string to float: '{t}'")))
 }
 
 /// `int(digits)` of a `-?\d+` capture.
-fn py_int(t: &str) -> Result<i64, Fail> {
+pub(crate) fn py_int(t: &str) -> Result<i64, Fail> {
     t.parse::<i64>()
         .map_err(|_| Fail(format!("invalid literal for int(): '{t}'")))
 }
@@ -338,15 +342,19 @@ fn net_pins<'a>(text: &'a str, out: &mut Vec<(&'a str, &'a str)>) {
 
 /// MACRO -> (width um, height um, pins in definition order with their median rectangle centre
 /// and direction), signal pins only.
-type Macros = HashMap<String, (f64, f64, HashMap<String, (f64, f64, String)>)>;
+pub(crate) type Macros = HashMap<String, (f64, f64, HashMap<String, (f64, f64, String)>)>;
 
-fn read_lef(path: &Path) -> Result<Macros, Fail> {
-    let text = read_text(path)?;
+pub(crate) fn read_lef(path: &Path) -> Result<Macros, Fail> {
+    lef_macros(&read_text(path)?)
+}
+
+/// `read_lef` of the text of a LEF file.
+pub(crate) fn lef_macros(text: &str) -> Result<Macros, Fail> {
     let mut macros: Macros = HashMap::default();
     let (mut mac, mut pin): (Option<String>, Option<String>) = (None, None);
     let (mut direction, mut usage) = (String::from("INPUT"), String::from("SIGNAL"));
     let mut rects: Vec<(f64, f64)> = Vec::new();
-    for raw in lines(&text) {
+    for raw in lines(text) {
         let t = tokens(raw);
         if t.is_empty() {
             continue;
@@ -404,13 +412,17 @@ fn read_lef(path: &Path) -> Result<Macros, Fail> {
 }
 
 /// CLASS BLOCK macro -> (width um, height um).
-fn read_blocks(path: &Path) -> Result<HashMap<String, (f64, f64)>, Fail> {
-    let text = read_text(path)?;
+pub(crate) fn read_blocks(path: &Path) -> Result<HashMap<String, (f64, f64)>, Fail> {
+    lef_blocks(&read_text(path)?)
+}
+
+/// `read_blocks` of the text of a LEF file.
+pub(crate) fn lef_blocks(text: &str) -> Result<HashMap<String, (f64, f64)>, Fail> {
     let mut blocks = HashMap::default();
     let (mut mac, mut size, mut cls): (Option<String>, Option<(f64, f64)>, Option<String>) =
         (None, None, None);
     let index = || Fail("list index out of range".into());
-    for raw in lines(&text) {
+    for raw in lines(text) {
         let t = tokens(raw);
         if t.is_empty() {
             continue;
@@ -444,10 +456,10 @@ fn read_blocks(path: &Path) -> Result<HashMap<String, (f64, f64)>, Fail> {
 
 /// A dict in insertion order with replacement in place.
 #[derive(Debug)]
-struct Ordered<V> {
-    keys: Vec<String>,
-    values: Vec<V>,
-    index: HashMap<String, usize>,
+pub(crate) struct Ordered<V> {
+    pub(crate) keys: Vec<String>,
+    pub(crate) values: Vec<V>,
+    pub(crate) index: HashMap<String, usize>,
 }
 
 impl<V> Default for Ordered<V> {
@@ -461,7 +473,7 @@ impl<V> Default for Ordered<V> {
 }
 
 impl<V> Ordered<V> {
-    fn insert(&mut self, k: &str, v: V) -> usize {
+    pub(crate) fn insert(&mut self, k: &str, v: V) -> usize {
         if let Some(&i) = self.index.get(k) {
             self.values[i] = v;
             i
@@ -472,28 +484,28 @@ impl<V> Ordered<V> {
             self.keys.len() - 1
         }
     }
-    fn get(&self, k: &str) -> Option<&V> {
+    pub(crate) fn get(&self, k: &str) -> Option<&V> {
         self.index.get(k).map(|&i| &self.values[i])
     }
 }
 
 /// A DEF port: direction, `LAYER` rectangle and placement.
 #[derive(Debug, Clone)]
-struct Port {
-    direction: String,
-    layer: Option<[i64; 4]>,
-    placed: Option<(i64, i64)>,
+pub(crate) struct Port {
+    pub(crate) direction: String,
+    pub(crate) layer: Option<[i64; 4]>,
+    pub(crate) placed: Option<(i64, i64)>,
 }
 
-struct Def<'a> {
-    comps: Ordered<(&'a str, i64, i64, &'a str)>,
-    ports: Ordered<Port>,
-    nets: Vec<(&'a str, Vec<(&'a str, &'a str)>)>,
-    scale: f64,
-    design: String,
+pub(crate) struct Def<'a> {
+    pub(crate) comps: Ordered<(&'a str, i64, i64, &'a str)>,
+    pub(crate) ports: Ordered<Port>,
+    pub(crate) nets: Vec<(&'a str, Vec<(&'a str, &'a str)>)>,
+    pub(crate) scale: f64,
+    pub(crate) design: String,
 }
 
-fn read_def(text: &str, max_nets: i64, max_pins: i64) -> Result<Def<'_>, Fail> {
+pub(crate) fn read_def(text: &str, max_nets: i64, max_pins: i64) -> Result<Def<'_>, Fail> {
     let mut comps = Ordered::default();
     let mut ports: Ordered<Port> = Ordered::default();
     let mut nets = Vec::new();
@@ -620,7 +632,7 @@ fn split_once_space(s: &str) -> (Option<&str>, Option<&str>) {
     (Some(head), (i < b.len()).then(|| &s[i..]))
 }
 
-fn read_die(text: &str) -> Result<[i64; 4], Fail> {
+pub(crate) fn read_die(text: &str) -> Result<[i64; 4], Fail> {
     for line in lines(text) {
         let mut c = Cur::at(line, 0);
         if c.lit("DIEAREA ( ") {
@@ -643,7 +655,7 @@ fn read_die(text: &str) -> Result<[i64; 4], Fail> {
 // Macro blockages.
 
 /// Python's `int(x)` of a float: truncation towards zero.
-fn trunc(x: f64) -> i64 {
+pub(crate) fn trunc(x: f64) -> i64 {
     x.trunc() as i64
 }
 
@@ -653,7 +665,7 @@ fn ceil(x: f64) -> i64 {
 
 type CellIx = (i64, i64);
 
-struct Blockages {
+pub(crate) struct Blockages {
     g: f64,
     max_searches: i64,
     searches: i64,
@@ -664,12 +676,12 @@ struct Blockages {
     y0: f64,
     nx: i64,
     ny: i64,
-    rects: Vec<(f64, f64, f64, f64)>,
+    pub(crate) rects: Vec<(f64, f64, f64, f64)>,
     blocked: Vec<bool>,
 }
 
 impl Blockages {
-    fn new(
+    pub(crate) fn new(
         def: &Def<'_>,
         blocks: &HashMap<String, (f64, f64)>,
         die: [i64; 4],
@@ -804,7 +816,7 @@ impl Blockages {
     }
 
     /// The rectilinear wire length from `p` to `q` (um) around hard macros.
-    fn length(&mut self, p: (f64, f64), q: (f64, f64)) -> Result<f64, Fail> {
+    pub(crate) fn length(&mut self, p: (f64, f64), q: (f64, f64)) -> Result<f64, Fail> {
         let manhattan = (p.0 - q.0).abs() + (p.1 - q.1).abs();
         let (lx, ux) = (p.0.min(q.0), p.0.max(q.0));
         let (ly, uy) = (p.1.min(q.1), p.1.max(q.1));
@@ -854,7 +866,7 @@ impl Blockages {
 /// Prim's rectilinear minimum spanning tree rooted at point 0: each round takes the unused point
 /// of the smallest distance to the tree (the lowest index among equals), and a point's distance
 /// and parent change only on a strictly smaller distance. Returns `(parent, child)` edges.
-fn mst(points: &[(f64, f64)]) -> Vec<(usize, usize)> {
+pub(crate) fn mst(points: &[(f64, f64)]) -> Vec<(usize, usize)> {
     let n = points.len();
     if n < 3 {
         return if n == 2 { vec![(0, 1)] } else { Vec::new() };
@@ -920,7 +932,7 @@ fn fmt_e(v: f64, precision: usize) -> String {
 }
 
 /// `repr(v)` of a float (shortest round-trip digits; exponent form below 1e-4 and from 1e16).
-fn repr(v: f64) -> String {
+pub(crate) fn repr(v: f64) -> String {
     if v.is_nan() {
         return "NaN".into();
     }
@@ -962,7 +974,7 @@ fn repr(v: f64) -> String {
 }
 
 /// `round(v, digits)` of a float: the double nearest the correctly rounded decimal.
-fn py_round(v: f64, digits: usize) -> f64 {
+pub(crate) fn py_round(v: f64, digits: usize) -> f64 {
     if !v.is_finite() {
         return v;
     }
@@ -970,7 +982,7 @@ fn py_round(v: f64, digits: usize) -> f64 {
 }
 
 /// Python's `sum` of floats from an integer start: compensated (Neumaier) summation.
-fn py_sum(values: impl IntoIterator<Item = f64>) -> Option<f64> {
+pub(crate) fn py_sum(values: impl IntoIterator<Item = f64>) -> Option<f64> {
     let mut it = values.into_iter();
     let first = it.next()?;
     let (mut f, mut c) = (0.0 + first, 0.0f64);
@@ -991,7 +1003,7 @@ fn py_sum(values: impl IntoIterator<Item = f64>) -> Option<f64> {
 
 /// A JSON value as Python's `json` module reads and writes it (objects keep their order).
 #[derive(Debug, Clone, PartialEq)]
-enum Json {
+pub(crate) enum Json {
     Null,
     Bool(bool),
     Int(i128),
@@ -1002,14 +1014,14 @@ enum Json {
 }
 
 impl Json {
-    fn get(&self, k: &str) -> Option<&Json> {
+    pub(crate) fn get(&self, k: &str) -> Option<&Json> {
         match self {
             Json::Object(items) => items.iter().rev().find(|(key, _)| key == k).map(|(_, v)| v),
             _ => None,
         }
     }
     /// `float(value)`.
-    fn float(&self) -> Result<f64, Fail> {
+    pub(crate) fn float(&self) -> Result<f64, Fail> {
         match self {
             Json::Int(i) => Ok(*i as f64),
             Json::Float(f) => Ok(*f),
@@ -1018,7 +1030,7 @@ impl Json {
         }
     }
     /// `int(value)`.
-    fn int(&self) -> Result<i64, Fail> {
+    pub(crate) fn int(&self) -> Result<i64, Fail> {
         match self {
             Json::Int(i) => i64::try_from(*i).map_err(|_| Fail("integer out of range".into())),
             Json::Float(f) if f.is_finite() => Ok(f.trunc() as i64),
@@ -1062,6 +1074,8 @@ impl Parser<'_> {
             b'{' => {
                 self.i += 1;
                 let mut items: Vec<(String, Json)> = Vec::new();
+                // The positions of the keys of a large object, built once it has 16 items.
+                let mut index: Option<HashMap<String, usize>> = None;
                 self.ws();
                 if self.lit("}") {
                     return Ok(Json::Object(items));
@@ -1078,11 +1092,7 @@ impl Parser<'_> {
                     }
                     let v = self.value(depth + 1)?;
                     // A repeated key keeps its first position and takes the last value.
-                    if let Some(slot) = items.iter_mut().find(|(key, _)| *key == k) {
-                        slot.1 = v;
-                    } else {
-                        items.push((k, v));
-                    }
+                    put(&mut items, &mut index, k, v);
                     self.ws();
                     if self.lit(",") {
                         continue;
@@ -1218,6 +1228,15 @@ impl Parser<'_> {
                     }
                 }
                 0x00..=0x1f => return self.err(),
+                0x20..=0x7f => {
+                    // A run of plain ASCII characters.
+                    let start = self.i - 1;
+                    while matches!(self.s.get(self.i), Some(&c) if (0x20..=0x7f).contains(&c) && c != b'"' && c != b'\\')
+                    {
+                        self.i += 1;
+                    }
+                    out.push_str(std::str::from_utf8(&self.s[start..self.i]).unwrap_or_default());
+                }
                 _ => {
                     // Copy one UTF-8 character.
                     let start = self.i - 1;
@@ -1237,7 +1256,39 @@ impl Parser<'_> {
     }
 }
 
-fn parse_json(text: &str) -> Result<Json, Fail> {
+/// `d[k] = v` on a dict under construction: a repeated key keeps its first position and takes the
+/// last value. `index` holds the key positions of a dict of 16 items or more.
+pub(crate) fn put(
+    items: &mut Vec<(String, Json)>,
+    index: &mut Option<HashMap<String, usize>>,
+    k: String,
+    v: Json,
+) {
+    if items.len() < 16 {
+        if let Some(slot) = items.iter_mut().find(|(key, _)| *key == k) {
+            slot.1 = v;
+        } else {
+            items.push((k, v));
+        }
+        return;
+    }
+    let index = index.get_or_insert_with(|| {
+        items
+            .iter()
+            .enumerate()
+            .map(|(i, (key, _))| (key.clone(), i))
+            .collect()
+    });
+    match index.get(&k) {
+        Some(&i) => items[i].1 = v,
+        None => {
+            index.insert(k.clone(), items.len());
+            items.push((k, v));
+        }
+    }
+}
+
+pub(crate) fn parse_json(text: &str) -> Result<Json, Fail> {
     let mut p = Parser {
         s: text.as_bytes(),
         i: 0,
@@ -1251,7 +1302,7 @@ fn parse_json(text: &str) -> Result<Json, Fail> {
 }
 
 /// `json.dumps` of a string (`ensure_ascii`).
-fn json_string(out: &mut String, s: &str) {
+pub(crate) fn json_string(out: &mut String, s: &str) {
     out.push('"');
     for ch in s.chars() {
         match ch {
@@ -1275,7 +1326,7 @@ fn json_string(out: &mut String, s: &str) {
 }
 
 /// `json.dumps(value, indent=2)` (`indent` Some) or `json.dumps(value)` (None).
-fn dump(out: &mut String, v: &Json, indent: Option<usize>, level: usize) {
+pub(crate) fn dump(out: &mut String, v: &Json, indent: Option<usize>, level: usize) {
     match v {
         Json::Null => out.push_str("null"),
         Json::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
@@ -1328,12 +1379,12 @@ fn close(out: &mut String, indent: Option<usize>, level: usize) {
     }
 }
 
-fn obj(items: Vec<(&str, Json)>) -> Json {
+pub(crate) fn obj(items: Vec<(&str, Json)>) -> Json {
     Json::Object(items.into_iter().map(|(k, v)| (k.to_string(), v)).collect())
 }
 
 /// `str(Path(p))`: repeated separators and `.` components removed, no trailing separator.
-fn path_str(p: &Path) -> String {
+pub(crate) fn path_str(p: &Path) -> String {
     let s = p.to_string_lossy();
     let lead = if s.starts_with("//") && !s.starts_with("///") {
         "//"
@@ -1354,12 +1405,12 @@ fn path_str(p: &Path) -> String {
     }
 }
 
-fn sha256_hex(bytes: &[u8]) -> String {
+pub(crate) fn sha256_hex(bytes: &[u8]) -> String {
     let digest = Sha256::digest(bytes);
     digest.iter().map(|b| format!("{b:02x}")).collect()
 }
 
-fn sha_file(path: &Path) -> Result<String, Fail> {
+pub(crate) fn sha_file(path: &Path) -> Result<String, Fail> {
     Ok(sha256_hex(&fs::read(path)?))
 }
 
@@ -1378,7 +1429,7 @@ fn escape(name: &str) -> String {
     out
 }
 
-fn orient(o: &str, x: f64, y: f64, w: f64, h: f64) -> Result<(f64, f64), Fail> {
+pub(crate) fn orient(o: &str, x: f64, y: f64, w: f64, h: f64) -> Result<(f64, f64), Fail> {
     Ok(match o {
         "N" => (x, y),
         "S" => (w - x, h - y),

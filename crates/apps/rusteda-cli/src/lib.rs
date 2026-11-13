@@ -6,6 +6,7 @@
 
 mod estimate;
 mod export;
+mod flow;
 mod import;
 mod import_lib;
 mod import_logic;
@@ -131,6 +132,19 @@ pub enum Cmd {
     Export(ExportArgs),
     /// Write a placement-based RC estimate (SPEF) of a placed DEF into a fresh directory.
     EstimateSpef(estimate::EstimateArgs),
+    /// Plan and apply one ECO round of the native frontend into a fresh directory.
+    EcoRound(flow::eco::EcoRoundArgs),
+    /// Write the cell policy, delay and sizing profiles, cell buses, IO projection and CTS
+    /// constraints of a native frontend run into a fresh directory.
+    FrontendProfiles(flow::helpers::HelperArgs),
+    /// Write the physical and routing configuration of a native frontend run, bound to its
+    /// clock root, into a fresh directory.
+    FrontendPhysical(flow::helpers::PhysicalArgs),
+    /// Write the load-aware pin plan of a pin-planning placement into a fresh directory.
+    FrontendPins(flow::helpers::PinsArgs),
+    /// Check a completed native frontend run and write its result record into a fresh
+    /// directory.
+    FrontendValidate(flow::helpers::HelperArgs),
     /// Print a shell completion script.
     Completions(CompletionsArgs),
 }
@@ -321,6 +335,11 @@ fn prescan(args: &[OsString]) -> Prescan {
         "revert",
         "export",
         "estimate-spef",
+        "eco-round",
+        "frontend-profiles",
+        "frontend-physical",
+        "frontend-pins",
+        "frontend-validate",
         "completions",
     ];
     let mut i = 0;
@@ -683,6 +702,11 @@ pub fn run_with_version(args: Vec<OsString>, version: &'static str) -> ExitCode 
         Cmd::Revert(_) => "rusteda revert",
         Cmd::Export(_) => "rusteda export",
         Cmd::EstimateSpef(_) => "rusteda estimate-spef",
+        Cmd::EcoRound(_) => "rusteda eco-round",
+        Cmd::FrontendProfiles(_) => "rusteda frontend-profiles",
+        Cmd::FrontendPhysical(_) => "rusteda frontend-physical",
+        Cmd::FrontendPins(_) => "rusteda frontend-pins",
+        Cmd::FrontendValidate(_) => "rusteda frontend-validate",
         Cmd::Completions(_) => "rusteda completions",
     };
 
@@ -694,6 +718,19 @@ pub fn run_with_version(args: Vec<OsString>, version: &'static str) -> ExitCode 
     // and envelope (RCLI-REQ-0026).
     if let Cmd::EstimateSpef(est) = &cli.cmd {
         return estimate::run(ws_path, est);
+    }
+    // The frontend helpers write their reference helper's files and standard output
+    // (RCLI-REQ-0027).
+    {
+        use flow::helpers::Helper;
+        match &cli.cmd {
+            Cmd::EcoRound(eco) => return flow::eco::run(ws_path, eco),
+            Cmd::FrontendProfiles(a) => return flow::helpers::run(ws_path, Helper::Profiles(a)),
+            Cmd::FrontendPhysical(a) => return flow::helpers::run(ws_path, Helper::Physical(a)),
+            Cmd::FrontendPins(a) => return flow::helpers::run(ws_path, Helper::Pins(a)),
+            Cmd::FrontendValidate(a) => return flow::helpers::run(ws_path, Helper::Validate(a)),
+            _ => {}
+        }
     }
     let ws_arg = ws_path.display().to_string();
     let inv = Invocation::new("rusteda", version, sub_name, argv_strings.clone());
@@ -965,6 +1002,12 @@ pub fn run_with_version(args: Vec<OsString>, version: &'static str) -> ExitCode 
                 Err(e) => finish_error(sub_name, Some(&ws_arg), None, e, Vec::new(), format, quiet),
             }
         }
-        Cmd::EstimateSpef(_) | Cmd::Completions(_) => unreachable!(),
+        Cmd::EstimateSpef(_)
+        | Cmd::EcoRound(_)
+        | Cmd::FrontendProfiles(_)
+        | Cmd::FrontendPhysical(_)
+        | Cmd::FrontendPins(_)
+        | Cmd::FrontendValidate(_)
+        | Cmd::Completions(_) => unreachable!(),
     }
 }
